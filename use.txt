@@ -1,0 +1,98 @@
+conda activate unitree-rl
+
+export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
+
+export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/nvidia_icd.json
+export __GLX_VENDOR_LIBRARY_NAME=nvidia
+export __NV_PRIME_RENDER_OFFLOAD=1
+
+pip install -e.
+cd rsl_rl/
+pip install -e.
+cd ..
+
+
+conda activate unitree-rl
+export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
+
+cd /home/gh/GYM/5-28/rsl_rl
+pip install -e .
+
+cd /home/gh/GYM/5-28
+pip install -e .
+
+
+===============================================================================================
+tensorboard --logdir=logs
+
+指定文件夹更改log中文件名字在前面添加字母Z默认play最后一个训练结果 
+python legged_gym/scripts/train.py --task=dog_502_parkour_moe --headless --num_envs 4096
+python legged_gym/scripts/play.py --task=dog_502_parkour_moe
+python deploy/deploy_mujoco/deploy_go2.py --config dog_502_parkour_moe.yaml
+
+mujoco测试代码添加参数记录导出功能
+--export-state-html  不加这个后缀仅保存npz格式
+--record-state-stride 5  降低保存频率压缩文件体积
+
+python legged_gym/scripts/train.py --task=b2_parkour_moe --headless --num_envs 4096
+python legged_gym/scripts/play.py --task=b2_parkour_moe
+python deploy/deploy_mujoco/deploy_go2.py --config b2_parkour_moe.yaml
+python deploy/deploy_mujoco/deploy_go2.py --config b2_parkour_moe.yaml --export-state-html
+
+python legged_gym/scripts/train.py --task=go2_parkour_moe --headless --num_envs 4096
+python legged_gym/scripts/play.py --task=go2_parkour_moe
+python deploy/deploy_mujoco/deploy_go2.py --config go2_parkour_moe.yaml
+
+python legged_gym/scripts/train.py --task=RM75_parkour_moe --headless --num_envs=4096
+python legged_gym/scripts/play.py --task=RM75_parkour_moe
+python deploy/deploy_mujoco/deploy_go2.py --config RM75_parkour_moe.yaml
+
+
+play 难度设置：  terrain.py
+if getattr(self.cfg, "terrain_style", "") == "mgdp_parkour":
+                difficulty = np.random.choice([0.7, 0.75])
+
+play 速度无上限，自学习最快速度 设置开关：flat_speed_search_enabled = True
+代码位置： go2_config_parkour_moe.py
+
+play 盲走设置： 更改mujoco中config的yaml文件
+manual_vision_flag: true  #为带着视觉
+manual_vision_flag: false  # 盲走
+
+
+
+mujoco难度地形设置   dog_502_parkour_moe.yaml
+
+
+
+legged_robot_config.py
+legged_robot.py
+go2_config_parkour_moe.py
+actor_critic_parkour_moe.py
+
+1'从bundle.pt导出onnx：
+cd /home/gh/GYM/5-28
+conda activate unitree-rl
+
+python tools/export_parkour_moe_trt_assets.py \
+  --bundle logs/go2_parkour_moe/exported/policies/parkour_moe_inference_bundle.pt \
+  --output-dir logs/go2_parkour_moe/exported/policies/parkour_moe_trt_assets
+
+
+
+2'测试pt和onnx：
+python tools/validate_parkour_moe_onnx.py \
+  --bundle logs/go2_parkour_moe/exported/policies/parkour_moe_inference_bundle.pt \
+  --onnx-dir logs/go2_parkour_moe/exported/policies/parkour_moe_trt_assets \
+  --trials 20 \
+  --steps 50 \
+  --refresh-every 5
+
+3'onnx转engine
+python tools/build_parkour_moe_trt_engines.py \
+  --onnx-dir /home/unitree/5-28/logs/go2_parkour_moe/exported/policies/parkour_moe_trt_assets \
+  --output-dir /home/unitree/5-28/trt \
+  --precision both \
+  --trtexec /usr/src/tensorrt/bin/trtexec
+
+effort=500

@@ -1,0 +1,756 @@
+python legged_gym/scripts/plot_terrain_gate_zt_tsne.py \
+  --record-dir logs/play_records/go2_parkour_moe/20260412_122438_go2_parkour_moe \
+  --max-samples-per-id 4500 \
+  --perplexity 30
+
+export LD_LIBRARY_PATH=/home/kemove/miniconda3/envs/unitree-rl/lib:$LD_LIBRARY_PATH
+
+python legged_gym/scripts/play.py --task=go2_parkour_moe
+
+python legged_gym/scripts/train.py --task=go2_parkour_moe --headless --num_envs 4096
+
+
+
+1、expert部分重写一下
+2、是否考虑把另一个框架的地形、任务设计和奖励等等全部移植进来
+
+
+=====================================================
+4.8
+
+改了gap范围0.6->0.9
+删了梅花桩
+添加了浮空石头到训练里，并且加到easy组
+
+不行
+
+====================================================
+
+4-9
+
+去掉了浮空石头
+启动了turn_over
+
+=====================================================
+
+4-10
+
+单独flat地形训练摔倒恢复
+测试发现有些地形会影响整体训练，暂时去掉
+
+一般
+
+=====================================================
+
+4-11
+
+调整flat中的摔倒姿势占比,暂时关闭了turn_over
+把base_height的惩罚在这几个地形上去掉：single gap，two_row_stones，one_row_stones， air_beams,看下是否可以优化跳动作
+
+不错不错，整体都上去了
+
+=====================================================
+
+4-12
+
+把no_progress下放到全等级
+
+验证OK
+
+=======================================================
+
+4-13
+
+把foot刷新高度改低到-0.3
+添加了浮空石头到训练里，并且加到easy组
+
+OK了，爬还是有点问题，感觉会提前抬手
+
+======================================================
+
+4-14
+
+1、把摔倒恢复加回去
+2、把hurdle地形的base_height也去掉 id:7
+3、把gap地形的抬腿奖励去掉 id：0
+4、hurdle范围调整，0.46-0.65变为0.6-0.65
+5、优化了落脚点设计，先在在z<-0.1的情况下会继续向前搜索
+
+不错，mujoco勉强可以过0.75m gap，低身爬0.25m和爬0.6m箱子成功率也高多了，摔倒恢复也ok
+
+=======================================================
+
+4-15
+
+1、摔倒恢复把完全翻倒也加上
+2、GAP地形速度提升试试
+3、targeted_foothold_terrain_ids中去掉：0（single_gap）
+
+上面三点训了个临时的，还行
+
+4、修改了双层transformer的bug，改回单层看看，感觉双层会拖慢训练
+
+不行
+
+========================================================
+
+4-16
+
+恢复1-14版本
+1、mgdp_gap_width_range 【0.1， 0.9】改为 [0.05, 0.8]
+2、摔倒恢复把完全翻倒也加上
+3、去掉SWAV_LOSS
+4、transformer级联用两套参数
+
+不行
+1、mgdp_gap_width_range 【0.1， 0.9】改为 [0.1, 0.8]
+2、摔倒恢复把完全翻倒也加上
+
+不行，估计那个成功只是运气好
+
+恢复1-14版本
+1、地形更新：
+a、two_row_stones地形，把左右石头的y分布固定，不要有横向移动，y偏移0.22
+c、corridor地形：最高难度调整为半宽16cm，其他等级随之变化
+d、step_stone地形： 石块尺寸： （未启用）
+[0.5→0.2]米，间距（x）： [0.175→0.25]米，间距（y）： [0.1→0.175] 米。单个石块（x/y）的随机化幅度： [0.0→0.48]×gap (x/y) ，沿 x 轴的整行随机化幅度：[0.0→0.48]×gap (x) 。
+e、single_bridge：最高难度半宽0.1m，其他等级随之变化
+
+2、添加深度相机的噪声处理（目前只启用高斯噪声），并为相机位置添加随机化：
+xyz_error（-0.01,0.01）m
+yaw_error(-5,5)deg
+
+不错不错！
+
+==========================================================================
+
+4-17
+
+1、把corridor的额外奖励也去掉:clearance_excluded_terrain_ids和targeted_foothold_terrain_ids
+2、single_bridge调回14版本了
+3、flat 全部免 no_progress
+
+可以，可以过0.8的GAP（概率更高），但是corridor仍然存在卡在门口的问题，摔倒恢复也存在mujoco NAN的问题
+
+==========================================================================
+
+4-18
+
+1、把GAP的落脚点预测去掉，让他自发学习高难度落脚
+2、corridor最难0.16->0.20
+3、修正了turn_over部分：
+-a、对于turn_over的backflip和sideflip，分别在5s和3s的时候检测他们是否成功翻起来，没有翻起来直接reset
+-b、在摔倒恢复的专属reward中添加target posture、base orientation（关闭），base_height
+-c、对于翻正的判断条件，添加一条：base高度离地0.3m
+4、为两种摔倒初始姿势添加了随机化
+
+不错不错！
+
+=============================================================================
+
+4-19
+
+1、把摔倒恢复改为[0.4, 0.4, 0.2] 
+
+好
+
+==============================================================================
+
+4-20
+
+1、把速度追踪为了gap修改，最大追踪误差取消
+
+好
+
+==============================================================================
+
+4-21-标杆
+
+1、kpkd从20 0.5 改为 40 1
+2、hurdle地形也取消速度追踪上限
+3、mgdp_gap_width_range = [0.1, 1.0] 原本0.8
+4、hurdle最高难度从0.65-0.7提升为0.7-0.75
+5、GAP和hurdle各多拿0.05的地形比例，减少了corridor和two_row_stones
+
+不错，就是single_bridge不好说
+
+==============================================================================
+
+4-23
+
+问题：
+1、仿真完全翻倒恢复也有问题
+2、仿真single_gap失误率高
+3、相机不够贴近真实
+3、仿真下楼梯和下坡拖腿，bounding步态
+
+尝试解决办法：
+1、完全翻倒还是关了吧 OK
+2、single_bridge移除抬脚奖励，base高度奖励 OK
+3、添加了边缘黑边，暂时未启用 X
+4、添加了拖腿惩罚 OK
+
+拖腿惩罚还是去掉吧，影响太大了，走路都不太对了。但是跳的真的不错！
+
+==============================================================================
+
+4-24
+
+问题：
+1、拖腿没有解决，反而导致走路更差了！！！！！！！！！！！！！！！！！！！！
+2、transformer想改个交叉注意力看看
+
+解决办法：
+1、去掉拖腿惩罚
+2、transformer自注意力修改
+
+上面单独存了一版，要训好像也能训出来，现在训这个
+
+3、为turn_over环境锁定false视觉mask
+
+这个也单独存了一版本
+
+还是怪怪的，跳跃都还不错，但是走路奇奇怪怪后腿又有问题了
+
+===============================================================================
+
+4-25
+
+23-24号的改动回退，然后对齐4-23-1m
+
+问题：
+1、现在正常运动后脚有问题
+2、需要解决一下那些去掉base_height的地形，上下一晃一晃的问题
+3、single_bridge收脚不太好
+4、one_row_stone和gap在视觉上难以分辨，把这个地形收窄
+5、斜坡可以再难点
+6、翻身那里有点BUG，原本0.3高度才判定翻身成功，然后经常出现翻过来卡在0.2x然后跑四五秒被刷走
+
+解决办法：
+1、斜坡难度提高到40度 OK
+####play过没啥问题应该
+
+2、对于base_height_excluded_terrain_ids，不要去掉，而是改成超过目标高度也不惩罚；并且直接去掉了base_height的-1到-10的课程，锁-1 OK
+####这个改动再play一个个看过进行验证了，基本惩罚都是在平地部分拿的
+
+3、single_gap和air_stones直接不计算base_height（corridor暂定，因为之前就算了，而且开play观察奖励值后觉得还行）
+####这里几个是真不能算，古法编程，大概验证通过了
+
+4、仅对于single-bridge地形，在该地形上去掉hip-to-default的计算 OK
+####相信CODEX
+
+5、对于one_row_stone，把它的难度范围上限改成0.35m间隔，一块石头5cm，这样可以和GAP区分开 OK
+####这个改动train可视化看过课程了，看起来还行
+
+6、turn_over_success_base_height = 0.2 # 翻身base判断条件降低，快速切换到正常模式的计算
+
+23-24保留改动：
+1、完全翻倒关了
+2、transformer自注意力修改(和4-23的核心区别)
+
+============================================================================
+
+4-26
+
+再次回退4-23-1m版本
+
+新改动：
+1、one_stone修正为连续板地形，与gap区分
+2、新增 hip_to_default_excluded_terrain_ids = [4]。
+
+2080ti对比，启用了crossattn
+
+============================================================================
+
+4-27 对比 4-23-1m 框架差异与待办
+
+对比基准：
+/home/kemove/quadruped_gym/历史版本维护/4-23-1m
+
+已确认无差异：
+1、rsl_rl/rsl_rl/storage/rollout_storage_parkour_moe.py 与 4-23-1m 一致。
+
+核心差异：
+1、Estimator 融合框架变化较大：
+   - 4-23-1m 是 image/proprio/vision flag 拼成 token 后过 TransformerEncoder，并且先预测 terrain_probs，再把 terrain token 拼回去做第二次编码。
+   - 当前版本改成 proprio query 对 visual tokens 做 cross-attention，移除了 TransformerEncoder 和 terrain token second pass。
+   - 待办：单独对比 cross-attn 版本和 4-23 transformer 版本的训练曲线、gate entropy、terrain_id_acc、m_hat/height map 重建误差；如果跳跃或走路变怪，优先怀疑这里。
+
+2、Fall recovery 已接入 estimator/router/MCP：
+   - privileged obs 从 268 增到 269，新增 fall_recovery 标志。
+   - estimator 新增 fall_recovery_head、expert_fall_recovery_encoder、router_fall_recovery_encoder。
+   - MCP 从 67 维变 68 维，actor policy 配置同步为 mcp_dim=68。
+   - PPO 新增 fall_recovery BCE loss，runner 新增 fall_recovery target。
+   - 待办：检查 deploy/export/play 侧所有 mcp_dim、num_privileged_obs、ONNX/pt 输入输出维度是否全部同步；老 checkpoint 不能直接加载，除非做兼容处理。
+
+3、Omni blind world-X 移动是 4-23-1m 没有的新任务分支：
+   - 当前版本新增 omni_mask、omni_world_lin_vel_x、reset 随机 yaw、世界 X 速度投影到机体系 command。
+   - runner 中 omni env 强制 vision mask=False。
+   - heading/yaw command 被固定为 0；抬腿和落脚点奖励在 omni 环境下改为世界 +X 方向。
+   - 待办：专项验证 yaw=0/90/180/-90 时 command 投回世界系是否始终 +X；检查 0-0.2 速度被 zero_command 清零后是否符合预期，是否需要给这段补原地转向或直接禁用清零。
+
+4、SWAV / balance 改动：
+   - prototype 数从 32 改成 16，Sinkhorn 加了全局 max 平移防溢出。
+   - load_balance_loss 已从 estimator total_loss 中移除，只保留日志。
+   - 待办：训练时重点看 terrain_swav_loss 是否从 ln(16)=2.773 附近下降；同时记录 terrain_id -> mean(gating_weights)、gate entropy、不同 terrain gate 均值距离，确认 SWAV 真的让 gate 按地形分开，而不是继续均匀猜。
+
+5、地形/奖励配置差异：
+   - go2_config_parkour_moe.py 新增 omni 相关配置。
+   - ramp_max_angle_deg、one_row_stone_gap_range、one_row_stone_x_size 被显式配置。
+   - hip_to_default_excluded_terrain_ids=[4] 已加入。
+   - no_progress、heading conditioned、targeted foothold、clearance 在 omni 分支下有新逻辑。
+   - 待办：逐地形 play 检查 ramp / one_row_stones / single_bridge / air_stones / flat，确认新配置没有把 4-23-1m 的标杆能力破坏。
+
+6、terrain_mgdp.py 差异：
+   - one_row_stones 从旧的随机间距/尺寸逻辑，改成由 gap_range、stone_size_x、stone_pitch_x 控制的连续板/窄板式结构。
+   - ramp 改为使用可配置 max_angle_deg。
+   - 待办：训练前保存一组地形可视化截图，特别确认 one_row_stones 与 single_gap 在深度图上可区分，且课程难度不是突变。
+
+优先级：
+1、先跑短训/可视化验证 cross-attn 框架是否比 4-23 transformer 稳。
+2、再看 omni blind 分支是否污染 easy terrain 的原能力。
+3、最后看 SWAV 去掉 balance 后 gate 是否真正分化。
+
+============================================================================
+
+4-28 当前 go2_parkour_moe 训练逻辑检查（对比 4-23-1m）
+
+对比基准：
+/home/kemove/quadruped_gym/历史版本维护/4-23-1m
+
+检查范围：
+1、legged_gym/envs/go2/go2_config_parkour_moe.py
+2、legged_gym/envs/go2/go2_parkour_env.py
+3、rsl_rl/rsl_rl/runners/onpolicyrunner_parkour_moe.py
+4、rsl_rl/rsl_rl/algorithms/ppo_parkour_moe.py
+5、rsl_rl/rsl_rl/modules/actor_critic_parkour_moe.py
+6、legged_gym/utils/terrain.py 与 terrain_mgdp.py
+
+已确认与 4-23-1m 一致：
+1、legged_gym/envs/base/legged_robot.py 无差异。
+2、legged_gym/envs/go2/go2_env.py 无差异。
+3、rsl_rl/rsl_rl/storage/rollout_storage_parkour_moe.py 无差异。
+
+当前训练链路：
+1、环境输出：
+   - actor obs 仍然是 45 维，本体观测 + command + action，不直接给真实高度图。
+   - critic privileged obs 当前是 269 维，比 4-23-1m 多 1 维 fall_recovery。
+   - privileged obs 结构为：旧 263 维基础 critic obs + feet_heights(4) + terrain_id(1) + fall_recovery(1)。
+   - estimator target 从 privileged obs 中取 v_t、h_tf、m_hat、terrain_id、fall_recovery。
+
+2、runner/estimator 更新：
+   - history_length=10，policy step 中按 camera.update_interval 刷 estimator。
+   - estimator 只通过自己的 loss 更新；传给 actor 的 mcp_code 会 detach，PPO 不反传到 estimator。
+   - easy terrain 的视觉 mask 仍按 vision_toggle_interval 翻转；新增 omni env 强制 vision mask=False。
+   - actor 输入是 mcp_code(68) + vision_flag(1) + obs_now(45)。
+   - critic 输入是 privileged_obs + vision_flag。
+
+3、PPO/estimator loss：
+   - PPO 主损失逻辑与 4-23-1m 基本一致。
+   - estimator loss 当前为 ht/mt/vt/next_obs/terrain_id/fall_recovery/z_kl/SWAV。
+   - load_balance_loss 仍计算和记录，但已不再加进 total_loss；4-23-1m 会乘 load_balance_coef=0.01。
+
+主要差异与结论：
+1、Estimator 框架差异最大：
+   - 4-23-1m：image/proprio/vision flag 拼 token，TransformerEncoder 编码；先预测 terrain_probs，再加 terrain token 做第二次编码。
+   - 当前：proprio token 通过 cross-attention 读 visual tokens，移除了 TransformerEncoder 和 terrain token second pass。
+   - 当前还加入 fall_recovery_head，并把 fall_recovery_pred 拼入 MCP。
+   - 风险：这会明显改变 gate、m_hat、terrain_id 的学习动力；如果高难度或走路形态变怪，要优先怀疑这里，而不是只调奖励。
+
+2、MCP/维度差异：
+   - 当前 task policy.mcp_dim=68。
+   - 68 = v_t(3) + h_tf(4) + z_mu(16) + z_tm(32) + terrain_onehot(12) + fall_recovery_pred(1)。
+   - runner 里实际给 actor/storage 的是 mcp_dim+vision_flag=69。
+   - 4-23-1m task mcp_dim=67，没有 fall_recovery。
+   - 注意：旧 checkpoint 不能直接无脑加载到当前模型。
+
+3、Omni 训练分支是 4-23-1m 没有的新逻辑：
+   - omni env 从 omni_terrain_ids=[6,8,10,11] 中按 omni_ratio=0.5 静态抽取。
+   - reset 时 omni 随机 yaw，然后把世界 +X 速度投影成机体系 lin_vel_x/lin_vel_y command。
+   - heading target 固定为随机 reset yaw，目的是保持机身朝向不转，只沿世界 +X 走。
+   - omni 被排除 turn_over，并且 runner 强制 vision mask=False。
+   - no_progress 对 omni 使用 omni_world_lin_vel_x 和世界 x progress；非 omni timeout 保持 2s，omni 单独放宽到 4s。
+   - 已新增 omni_target_yaw_error：只对 omni 生效，允许 0.25rad deadzone，超过后轻罚偏离出生 yaw，防止恢复后偷偷转成正向走。
+
+4、最新 reward mask 检查：
+   - 非 omni 的 targeted_foothold 与 4-23-1m 等价：
+     terrain_id in targeted_foothold_terrain_ids 且 commands[:,0] > threshold。
+   - 非 omni 的 upward_foothold_clearance 与 4-23-1m 等价：
+     body yaw forward、commands[:,0]、base_lin_vel[:,0]、clearance_excluded_terrain_ids。
+   - 当前已修正 omni：
+     a. 所有 omni 都不吃 targeted_foothold_touchdown。
+     b. clearance 不再使用 "| omni_mask" 覆盖排除表。
+     c. 所以当前 omni 下 air_stones(6)、single_gap(0)、corridor(9) 不吃抬脚奖励；当前实际 omni 地形中 air_stones 不吃，ramp/stairs_up 吃，flat 基本无 terrain_rise 触发。
+   - 结论：这部分不会影响正向非 omni 环境。
+
+5、地形差异：
+   - terrain_mgdp.py 中 one_row_stones 从旧随机块逻辑，改成 gap_range + stone_size_x + stone_pitch_x 控制的连续窄板/间隔结构。
+   - ramp 使用 ramp_max_angle_deg 配置。
+   - terrain.py 的 randomized_terrain 中 mgdp difficulty 从 [0.9,0.95] 改成 [0.7,0.75]，但当前训练 terrain.curriculum=True，因此正常 curriculum 训练不走 randomized_terrain；只影响关闭 curriculum 的随机地形生成。
+
+发现的可疑点 / 待办：
+1、hip_to_default_excluded_terrain_ids=[4] 已补上。
+   - Go2ParkourRobot 现在会读取 go2_config_parkour_moe.py 里的 hip_to_default_excluded_terrain_ids。
+   - _reward_hip_to_default 已按 terrain_id mask，single_bridge(4) 不再计算 hip_to_default。
+
+2、omni_disable_forward_rewards 当前没有实际使用。
+   - go2_parkour_env.py 有 _omni_disables_forward_rewards()，但没有任何 reward 调用它。
+   - 如果希望 omni 不吃某些 forward 专用 shaping，需要补具体 mask；否则这个配置只是摆设。
+
+3、no_progress 已对 omni 单独放宽。
+   - 非 omni 仍使用 no_progress_timeout_s=2s。
+   - omni 使用 omni_no_progress_timeout_s=4s，给 blind omni 卡脚恢复留窗口。
+   - 如果高 difficulty 仍上不去，再考虑 no_progress_min_terrain_level=3。
+
+4、cross-attn 与 4-23 transformer 应单独 A/B。
+   - 不要把 omni reward、fall recovery、cross-attn、SWAV/load balance 全混在一次实验里判断。
+   - 建议至少保存两组短训：当前 cross-attn 与回退 transformer，其余配置不动，对比 terrain_level、terrain_id_acc、mt_loss、gate entropy、实际 play。
+
+5、omni 分支不要污染非 omni 标杆能力。
+   - 当前 mask 设计上非 omni targeted/clearance 等价于 4-23-1m。
+   - 仍需 play 验证非 omni ramp/stairs_up/air_stones/flat 的 terrain_level 是否下降。
+   - 如果下降，优先看共享 estimator/actor 是否被 omni blind 样本拉偏，而不是这两个 reward mask。
+
+优先验证顺序：
+1、先验证非 omni 正向能力是否保持 4-23-1m 标杆。
+2、再单独看 omni blind 在 ramp/stairs_up/air_stones 的 level 曲线。
+3、再看 estimator：terrain_id_acc、mt_loss、fall_recovery_acc、gate 是否分化。
+4、最后决定是否恢复 transformer 或调整 no_progress。
+
+2080ti BPO对照
+
+对应4-27-TRY2
+
+4-28 复查：非 omni 对比 4-23-1m 与当前 omni 逻辑
+
+1、非 omni 结论：
+   - base legged_robot.py、go2_env.py、rollout_storage_parkour_moe.py 与 4-23-1m 一致。
+   - targeted_foothold、upward_foothold_clearance、heading_conditioned、no_progress 对非 omni 的计算路径仍等价于 4-23-1m。
+   - 明确差异：
+   single_bridge(4) 现在会按 hip_to_default_excluded_terrain_ids 跳过 hip_to_default；
+   estimator 已从 4-23 transformer 改为 cross-attn，并多了 fall_recovery；
+   terrain_mgdp 的 one_row_stones/ramp 生成也和 4-23 不同。
+   - 所以：omni mask 本身没有改坏非 omni reward，但当前整体训练系统不等同于 4-23-1m。
+
+2、当前 omni 逻辑：
+   - omni 只在 [air_stones(6), ramp(8), stairs_up(10), flat(11)] 中按 omni_ratio=0.5 抽取，runner 中强制 blind。
+   - reset 时随机 yaw，保存 target_yaw，并固化 body-frame 运动方向 [cos(yaw0), -sin(yaw0)]。
+   - command 重采样只更新速度大小，后续不再按当前 yaw 重投影到 world X。
+   - yaw command 仍追 target_yaw，omni_target_yaw_error=-0.05 轻罚偏航；所有 omni 不吃 foothold，air_stones 不吃 clearance，omni no_progress timeout=4s。
+
+================================================================================
+
+4-30 简查：当前框架 vs 4-23-1m
+
+1、主要差异集中在 parkour MoE：
+   - 当前新增 omni、fall_recovery，privileged_obs 268->269，mcp_dim 67->68。
+   - actor_critic 从 4-23 的 terrain token 二次融合，改成当前 proprio token 路径，并加入 fall_recovery head/router 特征。
+   - PPO 增加 fall_recovery_loss，load_balance_coef 从 0.01 改为 0.0。
+
+2、环境/reward 差异：
+   - omni env 会强制 blind、随机 yaw、排除 turn_over，no_progress 放宽到 4s。
+   - heading_conditioned、targeted_foothold 对 omni 屏蔽；single_bridge 新增窄步态奖励，hip_to_default 可按 terrain_id 排除。
+   - 待办：继续确认非 omni 标杆能力没有被 omni/fall_recovery 共享网络拉低。
+
+3、地形和部署差异：
+   - terrain_mgdp 的 one_row_stones 改为 gap_range/stone_pitch 控制，ramp 改为 ramp_max_angle_deg。
+   - terrain.py 关闭 curriculum 时的 mgdp 难度范围变化；正常 curriculum 训练影响较小。
+   - Mujoco config/xml 测试线路和初始命令改动较多，play 对比时要固定同一 xml/cmd。
+
+4、优先待办：
+   - 做 4-23 transformer vs 当前 cross-attn 的短训 A/B，其余配置尽量不动。
+   - 分开看非 omni 与 omni 曲线：terrain_level、terrain_id_acc、mt_loss、fall_recovery_acc、gate entropy。
+   - 旧 checkpoint 不要直接混用当前 68 维 MCP/269 privileged_obs。
+
+================================================================================
+
+5-4 MoE 专家独立记忆改动
+
+已改：
+1、去掉共享记忆路径。
+   - 删除 ReadMLP / WriteMLP。
+   - 删除 shared_state / shared_state_updater / shared_state_norm。
+   - 删除 shared_state_dim / shared_state_alpha 配置。
+
+2、改为 4 个专家各自维护 hidden state。
+   - 每个专家是一个独立 GRUCell。
+   - runtime state 从 [num_envs, hidden_dim] 改为 [num_envs, expert_num, expert_hidden_dim]。
+   - forward 中分别更新 h1/h2/h3/h4，再由 router 权重混合专家输出。
+
+3、5-4 已清理未启用项。
+   - router_entropy schedule / loss / 日志已从 parkour PPO 与配置中删除。
+   - memory_gate 统计已删除。
+   - load_balance_coef、gate_smooth_coef、cycle_consistency_coef、vision_consistency_coef 这些 no-op 参数已删除。
+   - load_balance_loss 仍保留为日志指标，用来看 batch 平均专家使用率，不进入 estimator total_loss。
+
+优劣判断：
+1、当前新版更符合“4 个专家各自记忆 + router 混合专家输出”的设计目标。
+2、相比共享记忆版本，专家状态更独立，分工更容易解释。
+3、旧版共享记忆表达能力更强，可能更能兜底视觉噪声或错误专家分配。
+4、这是架构切换，旧 checkpoint 不直接兼容；旧版作为 A/B 对照保留。
+
+验证待办：
+1、短训 A/B：专家独立 hidden vs 旧版共享记忆，其余配置尽量不动。
+2、看专家平均权重 / load_balance_loss：
+   - 不要长期 [0.25,0.25,0.25,0.25]。
+   - 也不要太早变成 [0.95,0.02,0.02,0.01]。
+3、对比 terrain_level、mt_loss、terrain_id_acc、fall_recovery_acc 和实际 play。
+4、如果新版不稳：
+   - 先看是否 4 个专家 hidden 被同质化。
+   - 如需重新约束 router，再单独引入明确生效的 target entropy 或 temperature 实验。
+
+================================================================================
+
+5-3 当前版 vs 历史版本 5-2-0.6 简对比
+
+历史版本路径：
+/home/kemove/quadruped_gym/历史版本维护/5-2-0.6
+
+主要区别：
+1、记忆结构不同。
+   - 5-2-0.6：M_t = LayerNorm(shared_state_updater(mixed_delta, M_{t-1}))，外层 GRU 再加工专家写入。
+   - 当前版：无共享 M；4 个专家各自维护 h_i，router 加权混合专家 hidden 后预测。
+
+2、router 约束当前已对齐。
+   - 5-2-0.6：没有 router_entropy loss / schedule。
+   - 当前版：router_entropy loss / schedule / 日志已删除；不再保留未启用配置。
+
+3、load balance 当前已对齐。
+   - 5-2-0.6：load_balance_loss 只记录，parkour MoE 的 total_loss 里没有乘 load_balance_coef。
+   - 当前版：load_balance_loss 仍只记录；load_balance_coef no-op 参数已删除。
+
+4、SWAV 调度当前已对齐。
+   - 5-2-0.6：terrain_swav_weight_max=0.02，warmup_start=2000，warmup_steps=8000，早期很快满权重。
+   - 当前版：同样是 0.02 / 2000 / 8000；仅在权重为 0 时跳过 cross_view_swav 计算。
+
+当前版设计目的：
+1、清理未启用参数，避免配置看起来生效但实际不进 loss。
+2、保留与 5-2-0.6 一致的 parkour PPO 主线，便于做干净对比。
+3、真正剩余的差异主要看 omni stairs foothold、randomized terrain 难度和 deploy 默认 xml。
+
+其他差异补充：
+1、router 网络结构也变了，不只是 loss 调度。
+   - 5-2-0.6：router 直接吃 obs_now + vision_flag + context_feature + terrain_probs编码 + fall_recovery编码，router 内部带 Softmax。
+   - 当前版：obs_now 先过 LayerNorm+Linear 得到 32维 proprio_router_feature；context_feature 先 LayerNorm；terrain_probs detach 后额外拼 terrain_confidence 和 terrain_entropy；router 输出 logits，外部再 Softmax。
+   - 影响：当前 router 更可控、更少反向污染 terrain classifier，但和 5-2-0.6 不是单纯参数差异。
+
+2、旧 checkpoint 兼容性变了。
+   - 当前版已删除 read/write/shared_state/shared_state_updater 相关参数。
+   - 旧 estimator checkpoint 不能直接 strict load，需要重新训练或单独写迁移逻辑。
+
+3、omni stairs 专用落脚点候选已移除。
+   - 5-4 已删除 go2_config_parkour_moe.py 中 omni_stairs_targeted_foothold 相关参数。
+   - 5-4 已删除 go2_parkour_env.py 中 _omni_stairs_targeted_foothold_mask 和 _compute_omni_stairs_foothold_candidates。
+   - 当前 targeted foothold 路径回到普通逻辑，omni stairs 不再有专用上台阶 foothold 候选。
+
+4、terrain.py 的 randomized_terrain 难度不同。
+   - 5-2-0.6：mgdp_parkour 随机地形 difficulty 从 [0.7, 0.75] 采样。
+   - 当前版：改为 [0.9, 0.95]。
+   - 如果 curriculum=True，正常训练主要不走 randomized_terrain；但关闭 curriculum 或随机地形测试会更难。
+
+5、Mujoco deploy 默认场景不同。
+   - 当前 deploy_mujoco/configs/go2_parkour_moe.yaml 默认打开 hurdle.xml。
+   - 5-2-0.6 中 hurdle.xml 是注释状态。
+   - play/deploy 对比时要固定同一个 xml，不能直接用默认配置比较。
+
+验证重点：
+1、固定同一 xml/cmd，对比 play/deploy。
+2、分开看 omni stairs 与非 omni 地形，避免 foothold 逻辑影响算法结论。
+3、继续看 load_balance_loss / 专家平均权重，但它现在只是诊断指标。
+
+================================================================================
+
+5-3 SwAV 贴近 CMoE 原文实现
+
+已改：
+1、SwAV 显式采用两个 MLP：
+   - g_t^z = MLP_g(gate output)
+   - e_t^z = MLP_e(gt 高程图)
+   - 代码中对应 gate_swav_mlp / elevation_swav_mlp。
+
+2、5-4 清理：swav_feature_dim 配置已删除。
+   - 当前 projector 输出维度仍由代码固定为 32。
+   - 不再保留没有被 estimator 读取的配置项。
+
+3、GO2 parkour MoE 当前沿用基线超参：
+   - swav_num_prototypes = 16
+   - swav_temperature = 0.1
+   - terrain_window_length 仍保留 10；原文公式有 H，但没有给具体 H。
+
+4、保留旧 checkpoint 兼容。
+   - gate_terrain_projector -> gate_swav_mlp
+   - elevation_terrain_projector -> elevation_swav_mlp
+
+注意：
+1、当前仍然用 gt_mt_step 作为 elevation view，不是 estimator 的 z_tm。
+2、SwAV 目标是让 gate 几何结构对齐高程上下文，不是直接做稀疏化。
+3、如果 terrain_swav_loss 仍长期接近 log(16)=2.773，则说明 prototype 仍接近均匀，需要继续检查样本窗口/权重/输入 view。
+
+5-4 移除 gate entropy no-op
+
+已改：
+1、router_entropy / router_entropy_weight / router_entropy_loss 日志统计已删除。
+2、router_entropy_loss 没有加入 estimator total_loss，也不再保留相关配置入口。
+3、load_balance_coef no-op 参数已从 parkour PPO 和 parkour algorithm 配置中删除。
+
+目的：
+1、避免 gate entropy 直接干扰多任务训练和专家容量利用。
+2、避免无效配置误导实验判断。
+3、如需恢复 router 约束，单独做一个明确接入 total_loss 的实验分支。
+
+
+#5-3晚对照
+Estimator/router 结构变了
+actor_critic_parkour_moe.py (line 325) 现在 router 多了 proprio_encoder、context_norm、terrain confidence/entropy 输入，并且 terrain/fall recovery 给 router 前做了 detach()。
+这会直接改变 expert 分配方式，是目前 hurdle/air_beams 最值得盯的变量。
+
+5-4 晚：shared_state 路径已删除
+当前是 4 个专家各自维护 expert_hidden_state：
+[num_envs, expert_num, expert_hidden_dim]
+router 混合 expert_hidden_states 后进入 prediction_head。
+
+Go2 配置多了 omni stairs targeted foothold
+go2_config_parkour_moe.py (line 220) 新增了 omni stairs 落脚点逻辑。
+这个只影响 omni stairs，非 omni 的 targeted foothold mask 仍然排除了 omni，所以不太像 hurdle/air_beams 的直接原因。
+
+=================================================================================================================
+5-7 
+
+做个单GRU的对比试验把，然后输出用的是GRU的记忆
+单gru完美复现，很难蚌，但是其实效果差一点
+
+预期增加的估计量：
+足端接触概率 contact_prob，4 维
+足端滑移/支撑质量 foot_slip 或 support_confidence，4 维
+支撑稳定性 / 摔倒风险 stability_margin
+足端位置或足端相对 base 的几何量，8 到 12 维
+下一步安全落脚点 / foothold delta，8 到 12 维
+地形方向相关 lookahead，少量维度
+然后还有一个就是目前actor初始化的时候visionflag是0权重
+
+以及FiLM替换actor试一下
+
+=================================================================================================================
+5-8
+
+1、transformer改进，改成置信度token
+2、GRU-MOE改1+3模式，并把记忆融合改成highway
+
+注意：最优解就是把encoder拆出来，然后由他给出token和confidence，然后就可以判断哪些token要丢，或者是整个token全扔+visionflag=false
+     包括actor输入的visionflag也要调
+
+还行，但是似乎解码器效果太好，解出来loss没差多少，并且抬腿问题更严重了，而且GAP地形略有下滑，1.2->1.1
+
+===========================================================
+
+5-11
+
+1、奖励调整
+feet_air_time = 0.0
+stand_still = -0.5
+target_posture = -0.01
+*：target_posture只在flat地形约束
+你把抬脚奖励和落脚点奖励在flat都去掉
+
+2、网络改进：
+添加context reconstruction
+现在的问题是，白色反光仍然处理的不太好，虽然相比本来有效果提升，但是还不够
+
+token比例拉高到0.3
+
+问题：站立不抬腿了很好。但是移动仍然抬腿，然后领域编码加进去效果没有提升太多，估计是筛选那边还存在问题，感觉是随机dropout token不符合现实分布，应该是dropout某一片的token，比较集中那中
+
+==============================================================
+
+5-13
+
+1、omni奖励添加：
+(1)stairs_omni_lead_touch_above
+(2)stairs_omni_trail_followup
+(3)stairs_omni_support_transfer_progress
+
+2、平地奖励添加：
+(1)平地移动 gait 
+(2)平地去除target姿态
+
+3、视觉 token dropout 从独立随机点改成空间块状 dropout
+
+=============================================
+
+5-16
+
+重做了 reward shaping，专门减少平地和非必要场景下的抬腿倾向，同时给平地步态稳定性和台阶支撑转移加了更明确的约束；
+另外视觉 estimator 加了更强的 token dropout 机制来提升鲁棒性。
+
+5-11 很可能还开着基类默认的 feet_air_time=1.0，而当前显式关成了 0.0。
+当前把 flat 从 clearance 和 targeted foothold 里拿掉了，并新增 stand_still + flat_gait 去压无意义抬脚。
+当前多了整套 stairs_omni_* 奖励。
+当前训练的 token dropout 默认从“全随机”变成了“块状丢弃”。
+
+差的一笔，跳都跳不明白
+
+==================================================================================
+
+5-17
+
+1、dropout全关了
+
+1、把zt(z_mu)从mcpcode里拿出来，也就是actor不接收zt(z_mu)
+2、去掉地形估计那条线上的moe-gru，改成和本体估计那边一样的单GRU形式（输入输出不变）
+3、把policy部分做成MOE-LOCO这篇文章的形式，四个专家。然后注意：
+（1）门控的输入和专家不同，专家接收目前actor的输出，门控只接收：mcp_code+vision_flag+`base_ang_vel` | 3 |
+| `projected_gravity` | 3 |
+| `commands[:3]` | 3 |
+这些东西
+（2）门控需要加一个loss单独约束，也就是现在的GRU-MOE用到的SWAV_loss，计算逻辑照搬当前，就是为了在不同地形下分化处不同的专家组。
+
+狗屎，差的一笔
+
+==================================================================================
+
+5-19
+
+加人工视觉采样
+
+不错，真减少时间了
+
+==================================================================================
+
+5-21
+
+加碰撞预测
+
+不太行，准确地说没区别
+
+==================================================================================
+
+5-23
+
+改回5-19加gait奖励
+
+我去怎么曲线这么抖
+
+==================================================================================
+
+5-24
+
+MoE-AC
+
+完美
+
+export LD_LIBRARY_PATH=/home/kemove/miniconda3/envs/unitree-rl/lib:$LD_LIBRARY_PATH
+
+python legged_gym/scripts/evaluate_parkour_moe.py \
+  --task=go2_parkour_moe \
+  --load_run May24_10-21-55_ \
+  --checkpoint 9900
+
+====================================================================================
+
+5-26
+
+随机丢弃打开
+
+改了几个楼梯奖励
+
+我草怎么AC的MOE有8个
