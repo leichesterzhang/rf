@@ -1,0 +1,71 @@
+<mujoco model="single_bridge_cross_1_4_7_10">
+  <include file="RM75.xml"/>
+  <!-- Terrain: Cross Single Bridge.
+       Difficulty mainly changes the bridge width, following the gym-side
+       single_bridge construction. -->
+  <statistic center="0 0 0.10" extent="1.2" />
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0" />
+    <rgba haze="0.15 0.25 0.35 1" />
+    <global azimuth="-130" elevation="-20" />
+  </visual>
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072" />
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.18 0.22 0.28" rgb2="0.10 0.14 0.18" markrgb="0.8 0.8 0.8" width="300" height="300" />
+    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.0" />
+    <texture name="tex_label_1" type="2d" file="./imgs/label_1.png" />
+    <material name="mat_label_1" texture="tex_label_1" specular="0" shininess="0" emission="1" texrepeat="1 1" rgba="1 1 1 1" />
+    <texture name="tex_label_7" type="2d" file="./imgs/label_7.png" />
+    <material name="mat_label_7" texture="tex_label_7" specular="0" shininess="0" emission="1" texrepeat="1 1" rgba="1 1 1 1" />
+    <texture name="tex_label_10" type="2d" file="./imgs/label_10.png" />
+    <material name="mat_label_10" texture="tex_label_10" specular="0" shininess="0" emission="1" texrepeat="1 1" rgba="1 1 1 1" />
+    <texture name="tex_label_4" type="2d" file="./imgs/label_4.png" />
+    <material name="mat_label_4" texture="tex_label_4" specular="0" shininess="0" emission="1" texrepeat="1 1" rgba="1 1 1 1" />
+  </asset>
+  <worldbody>
+    <light pos="0 0 1.5" dir="0 0 -1" directional="true" />
+
+    <geom name="pit_floor" pos="0 0 -1.25" size="20 20 0.10" type="box" material="groundplane" />
+    <geom name="hub" pos="0 0 -0.60" type="box" size="0.90 0.90 0.60" rgba="0.40 0.41 0.44 1" />
+
+    <!-- neg_x direction, level 1, difficulty=0.1, single_bridge -->
+    <geom name="neg_x_bridge_1" pos="-1.4 0 -0.6" type="box" size="0.5 0.277778 0.6" rgba="0.47 0.45 0.40 1" />
+    <geom name="neg_x_bridge_2" pos="-2.4 0 -0.59" type="box" size="0.5 0.277778 0.61" rgba="0.47 0.45 0.40 1" />
+    <geom name="neg_x_bridge_3" pos="-3.4 0 -0.58" type="box" size="0.5 0.277778 0.62" rgba="0.47 0.45 0.40 1" />
+    <geom name="neg_x_bridge_4" pos="-4.4 0 -0.59" type="box" size="0.5 0.277778 0.61" rgba="0.47 0.45 0.40 1" />
+    <geom name="neg_x_bridge_5" pos="-5.4 0 -0.6" type="box" size="0.5 0.277778 0.6" rgba="0.47 0.45 0.40 1" />
+    <geom name="neg_x_landing" pos="-6.3 0 -0.6" type="box" size="0.425 0.39 0.6" rgba="0.42 0.42 0.44 1" />
+    <geom name="neg_x_label" pos="-0.62 0 0.002" type="box" size="0.18 0.10 0.0001" contype="0" conaffinity="0" group="1" material="mat_label_1" rgba="1 1 1 1" />
+
+    <!-- pos_y direction, level 7, difficulty=0.7, single_bridge -->
+    <geom name="pos_y_bridge_1" pos="0 1.4 -0.6" type="box" size="0.144444 0.5 0.6" rgba="0.47 0.45 0.40 1" />
+    <geom name="pos_y_bridge_2" pos="0 2.4 -0.59" type="box" size="0.144444 0.5 0.61" rgba="0.47 0.45 0.40 1" />
+    <geom name="pos_y_bridge_3" pos="0 3.4 -0.58" type="box" size="0.144444 0.5 0.62" rgba="0.47 0.45 0.40 1" />
+    <geom name="pos_y_bridge_4" pos="0 4.4 -0.59" type="box" size="0.144444 0.5 0.61" rgba="0.47 0.45 0.40 1" />
+    <geom name="pos_y_bridge_5" pos="0 5.4 -0.6" type="box" size="0.144444 0.5 0.6" rgba="0.47 0.45 0.40 1" />
+    <geom name="pos_y_landing" pos="0 6.3 -0.6" type="box" size="0.28 0.425 0.6" rgba="0.42 0.42 0.44 1" />
+    <geom name="pos_y_label" pos="0 0.62 0.002" type="box" size="0.10 0.18 0.0001" quat="0.7071067811865476 0 0 0.7071067811865475" contype="0" conaffinity="0" group="1" material="mat_label_7" rgba="1 1 1 1" />
+
+    <!-- pos_x direction, level 10, difficulty=0.9, single_bridge -->
+    <geom name="pos_x_bridge_1" pos="1.4 0 -0.6" type="box" size="0.5 0.13 0.6" rgba="0.47 0.45 0.40 1" />
+    <geom name="pos_x_bridge_2" pos="2.4 0 -0.59" type="box" size="0.5 0.13 0.61" rgba="0.47 0.45 0.40 1" />
+    <geom name="pos_x_bridge_3" pos="3.4 0 -0.58" type="box" size="0.5 0.13 0.62" rgba="0.47 0.45 0.40 1" />
+    <geom name="pos_x_bridge_4" pos="4.4 0 -0.59" type="box" size="0.5 0.13 0.61" rgba="0.47 0.45 0.40 1" />
+    <geom name="pos_x_bridge_5" pos="5.4 0 -0.6" type="box" size="0.5 0.13 0.6" rgba="0.47 0.45 0.40 1" />
+    <geom name="pos_x_landing" pos="6.3 0 -0.6" type="box" size="0.425 0.25 0.6" rgba="0.42 0.42 0.44 1" />
+    <geom name="pos_x_label" pos="0.62 0 0.002" type="box" size="0.18 0.10 0.0001" contype="0" conaffinity="0" group="1" material="mat_label_10" rgba="1 1 1 1" />
+
+    <!-- neg_y direction, level 4, difficulty=0.4, single_bridge -->
+    <geom name="neg_y_bridge_1" pos="0 -1.4 -0.6" type="box" size="0.211111 0.5 0.6" rgba="0.47 0.45 0.40 1" />
+    <geom name="neg_y_bridge_2" pos="0 -2.4 -0.59" type="box" size="0.211111 0.5 0.61" rgba="0.47 0.45 0.40 1" />
+    <geom name="neg_y_bridge_3" pos="0 -3.4 -0.58" type="box" size="0.211111 0.5 0.62" rgba="0.47 0.45 0.40 1" />
+    <geom name="neg_y_bridge_4" pos="0 -4.4 -0.59" type="box" size="0.211111 0.5 0.61" rgba="0.47 0.45 0.40 1" />
+    <geom name="neg_y_bridge_5" pos="0 -5.4 -0.6" type="box" size="0.211111 0.5 0.6" rgba="0.47 0.45 0.40 1" />
+    <geom name="neg_y_landing" pos="0 -6.3 -0.6" type="box" size="0.37 0.425 0.6" rgba="0.42 0.42 0.44 1" />
+    <geom name="neg_y_label" pos="0 -0.62 0.002" type="box" size="0.10 0.18 0.0001" quat="0.7071067811865476 0 0 -0.7071067811865475" contype="0" conaffinity="0" group="1" material="mat_label_4" rgba="1 1 1 1" />
+  </worldbody>
+
+  <keyframe>
+    <key name="single_bridge_start" qpos="0 0 0.53 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"/>
+  </keyframe>
+</mujoco>

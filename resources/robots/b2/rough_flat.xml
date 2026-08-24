@@ -1,0 +1,12 @@
+<mujoco model="b2 rough flat scene">
+  <include file="b2.xml"/>
+  <include file="../rough_flat_terrain.xml"/>
+
+  <worldbody>
+    <geom name="b2_rough_flat_catch_floor" pos="0 0 -0.145" size="0 0 0.05" type="plane" material="groundplane" friction="1.0 0.02 0.01"/>
+  </worldbody>
+
+  <keyframe>
+    <key name="rough_flat_start" qpos="0 0 0.68 1 0 0 0 0.1 0.8 -1.5 -0.1 0.8 -1.5 0.1 1.0 -1.5 -0.1 1.0 -1.5"/>
+  </keyframe>
+</mujoco>

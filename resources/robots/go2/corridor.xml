@@ -1,0 +1,57 @@
+<mujoco model="corridor_cross_1_4_7_10">
+  <include file="go2.xml"/>
+  <!-- Terrain: Cross Corridor, Levels: 1,4,7,10.
+       Corridor full widths: 0.7467m, 0.5867m, 0.4267m, 0.3200m. -->
+  <statistic center="0 0 0.10" extent="1.2" />
+
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0" />
+    <rgba haze="0.15 0.25 0.35 1" />
+    <global azimuth="-130" elevation="-20" />
+  </visual>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072" />
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.18 0.22 0.28" rgb2="0.10 0.14 0.18" markrgb="0.8 0.8 0.8" width="300" height="300" />
+    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.0" />
+    <texture name="tex_label_1" type="2d" file="./imgs/label_1.png" />
+    <material name="mat_label_1" texture="tex_label_1" specular="0" shininess="0" emission="1" texrepeat="1 1" rgba="1 1 1 1" />
+    <texture name="tex_label_7" type="2d" file="./imgs/label_7.png" />
+    <material name="mat_label_7" texture="tex_label_7" specular="0" shininess="0" emission="1" texrepeat="1 1" rgba="1 1 1 1" />
+    <texture name="tex_label_10" type="2d" file="./imgs/label_10.png" />
+    <material name="mat_label_10" texture="tex_label_10" specular="0" shininess="0" emission="1" texrepeat="1 1" rgba="1 1 1 1" />
+    <texture name="tex_label_4" type="2d" file="./imgs/label_4.png" />
+    <material name="mat_label_4" texture="tex_label_4" specular="0" shininess="0" emission="1" texrepeat="1 1" rgba="1 1 1 1" />
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 1.5" dir="0 0 -1" directional="true" />
+
+    <geom name="pit_floor" pos="0 0 -1.25" size="20 20 0.10" type="box" material="groundplane" />
+    <geom name="hub" pos="0 0 -0.60" type="box" size="0.90 0.90 0.60" rgba="0.42 0.42 0.44 1" />
+
+    <!-- neg_x direction, level 1, difficulty=0.1, corridor full width=0.7467 -->
+    <geom name="neg_x_floor" pos="-4.5 0 -0.60" type="box" size="3.60 0.373333 0.60" rgba="0.52 0.52 0.54 1" />
+    <geom name="neg_x_wall_left" pos="-4.5 0.453333 0.70" type="box" size="3.00 0.08 0.70" rgba="0.63 0.49 0.34 1" />
+    <geom name="neg_x_wall_right" pos="-4.5 -0.453333 0.70" type="box" size="3.00 0.08 0.70" rgba="0.63 0.49 0.34 1" />
+    <geom name="neg_x_label" pos="-0.62 0 0.002" type="box" size="0.18 0.10 0.0001" contype="0" conaffinity="0" group="1" material="mat_label_1" rgba="1 1 1 1" />
+
+    <!-- pos_y direction, level 7, difficulty=0.7, corridor full width=0.4267 -->
+    <geom name="pos_y_floor" pos="0 4.5 -0.60" type="box" size="0.213333 3.60 0.60" rgba="0.52 0.52 0.54 1" />
+    <geom name="pos_y_wall_left" pos="-0.293333 4.5 0.70" type="box" size="0.08 3.00 0.70" rgba="0.63 0.49 0.34 1" />
+    <geom name="pos_y_wall_right" pos="0.293333 4.5 0.70" type="box" size="0.08 3.00 0.70" rgba="0.63 0.49 0.34 1" />
+    <geom name="pos_y_label" pos="0 0.62 0.002" type="box" size="0.10 0.18 0.0001" quat="0.7071067811865476 0 0 0.7071067811865475" contype="0" conaffinity="0" group="1" material="mat_label_7" rgba="1 1 1 1" />
+
+    <!-- pos_x direction, level 10, difficulty=0.9, corridor full width=0.3200 -->
+    <geom name="pos_x_floor" pos="4.5 0 -0.60" type="box" size="3.60 0.36 0.60" rgba="0.52 0.52 0.54 1" />
+    <geom name="pos_x_wall_left" pos="4.5 0.24 0.70" type="box" size="3.00 0.08 0.70" rgba="0.63 0.49 0.34 1" />
+    <geom name="pos_x_wall_right" pos="4.5 -0.24 0.70" type="box" size="3.00 0.08 0.70" rgba="0.63 0.49 0.34 1" />
+    <geom name="pos_x_label" pos="0.62 0 0.002" type="box" size="0.18 0.10 0.0001" contype="0" conaffinity="0" group="1" material="mat_label_10" rgba="1 1 1 1" />
+
+    <!-- neg_y direction, level 4, difficulty=0.4, corridor full width=0.5867 -->
+    <geom name="neg_y_floor" pos="0 -4.5 -0.60" type="box" size="0.293333 3.60 0.60" rgba="0.52 0.52 0.54 1" />
+    <geom name="neg_y_wall_left" pos="-0.373333 -4.5 0.70" type="box" size="0.08 3.00 0.70" rgba="0.63 0.49 0.34 1" />
+    <geom name="neg_y_wall_right" pos="0.373333 -4.5 0.70" type="box" size="0.08 3.00 0.70" rgba="0.63 0.49 0.34 1" />
+    <geom name="neg_y_label" pos="0 -0.62 0.002" type="box" size="0.10 0.18 0.0001" quat="0.7071067811865476 0 0 -0.7071067811865475" contype="0" conaffinity="0" group="1" material="mat_label_4" rgba="1 1 1 1" />
+  </worldbody>
+</mujoco>

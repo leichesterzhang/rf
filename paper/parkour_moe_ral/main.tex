@@ -1,0 +1,306 @@
+\documentclass[letterpaper,10pt,conference]{ieeeconf}
+
+\IEEEoverridecommandlockouts
+\overrideIEEEmargins
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{balance}
+
+\hypersetup{hidelinks}
+
+\newif\ifreview
+\reviewtrue
+
+\newif\ifshowtodo
+\showtodotrue
+
+\DeclareRobustCommand{\papercomment}[1]{%
+    \ifshowtodo
+    \textcolor{blue}{\textbf{[TODO]} #1}%
+    \fi
+}
+\newcommand{\placeholderfigure}[2]{%
+    \fbox{%
+        \parbox[c][#2][c]{0.96\linewidth}{%
+            \centering
+            \textbf{Placeholder figure}\\[0.5em]
+            #1
+        }%
+    }%
+}
+
+\title{\LARGE \bf
+ParkourMoE: Terrain-Aware Read-Write Mixture-of-Experts for\\
+Visuo-Proprioceptive Quadruped Parkour
+}
+
+\author{
+\ifreview
+Anonymous Authors for RA-L Review
+\else
+Author Names Omitted for Workspace Draft
+\fi
+}
+
+\begin{document}
+\maketitle
+\thispagestyle{empty}
+\pagestyle{empty}
+
+\begin{abstract}
+This paper presents \emph{ParkourMoE}, a visuo-proprioceptive locomotion framework for quadruped parkour over gaps, stepping stones, beams, hurdles, ramps, stairs, and flat terrain. The current implementation combines a multimodal estimator, a terrain-aware selector, a read-write mixture-of-experts (MoE) memory module, and an asymmetric actor-critic policy optimized with PPO. The estimator fuses a 10-step proprioceptive history, a two-frame proxy depth stream, and an explicit vision-availability token, then predicts base velocity, foot-ground clearance, a local terrain elevation map, terrain identity, and a compact motion-context code for control. A shared-state read-write expert design is used to preserve temporal continuity while still allowing terrain-dependent expert specialization. The training stack further integrates terrain curriculum, targeted foothold and clearance rewards, latent regularization, routing load-balancing, and a cross-view SwAV-style consistency loss between gating patterns and reconstructed terrain cues. \papercomment{Replace this sentence with final quantitative gains, e.g., success-rate and forward-progress improvements over the strongest baselines.}
+\end{abstract}
+
+\vspace{0.4em}
+\noindent\textbf{Keywords:} legged locomotion, reinforcement learning, terrain perception, mixture-of-experts, quadruped robots.
+
+\section{Introduction}
+Quadruped parkour requires more than stable locomotion on rough ground. A practical system must traverse multiple obstacle families, reason about sparse footholds, maintain forward progress under partial observability, and remain controllable when visual information becomes unreliable. These requirements make the problem difficult for a single reactive policy: geometry varies across terrain families, motion phases shift quickly, and the policy must smoothly switch between terrain-specific behavior modes without losing dynamic continuity.
+
+Recent learning-based legged locomotion systems have shown impressive robustness in simulation and in the wild, especially when massively parallel reinforcement learning and perceptive policies are combined \cite{rudin2022learning,miki2022learning,hwangbo2019learning}. However, parkour-style traversal still stresses three unresolved aspects. First, terrain-conditioned skill switching must remain smooth across time. Second, visual and proprioceptive information should be fused without making the policy brittle to missing or corrupted vision. Third, the latent interface between perception and control should stay compact enough for efficient policy learning while remaining predictive of task-relevant geometry.
+
+To address these issues, we build on the current \texttt{parkour\_moe} codebase and formulate a terrain-aware read-write MoE estimator-actor-critic framework for Go2. The proposed design introduces a shared memory state that is read by each expert and updated through a gated mixture of expert-specific write operations. Instead of treating experts as isolated recurrent branches, the model uses the shared state as a continuity-preserving latent context across terrain transitions and vision-mask changes. The framework also predicts terrain identity and local height structure explicitly, then injects the resulting motion-context code into an asymmetric actor-critic controller.
+
+The manuscript is written to match the current implementation rather than an idealized design. In particular, the training code already supports terrain curriculum, easy-terrain vision masking, terrain-aware routing, local height-map reconstruction, and gate/map consistency regularization. The inference code also contains an autoencoder-based selector interface, but the line that disables vision online is currently commented out. We therefore describe that component carefully as an available extension point rather than a finished experimental claim.
+
+The main contributions of this paper are as follows.
+\begin{enumerate}
+    \item We present a read-write MoE memory architecture for visuo-proprioceptive quadruped parkour, where experts communicate through a shared latent state instead of independent recurrent trajectories.
+    \item We instantiate this design in a complete parkour training stack that couples proxy depth sensing, terrain-conditioned routing, asymmetric privileged supervision, and parkour-specific rewards for clearance and targeted footholds.
+    \item We provide an evaluation protocol, ablation plan, and figure/table scaffold aligned with RA-L style, so the current codebase can be turned into a submission-ready paper after quantitative experiments and visual assets are filled in.
+\end{enumerate}
+
+\section{Related Work}
+\textbf{Learning-based quadruped locomotion.}
+Massively parallel reinforcement learning has substantially reduced training time for dynamic locomotion policies and enabled strong zero-shot transfer to hardware \cite{rudin2022learning,hwangbo2019learning}. These advances motivate our simulation-first parkour pipeline and the PPO-based control backbone.
+
+\textbf{Perceptive legged locomotion.}
+Visual terrain awareness improves foothold selection and obstacle traversal in unstructured environments \cite{miki2022learning}. Our framework follows this line of work, but uses a proxy depth stream generated from terrain geometry and explicitly trains vision-available and vision-masked modes on easy terrains.
+
+\textbf{Mixture-of-experts and sequence models.}
+Mixture-of-experts models are a natural choice when terrain families induce different control modes \cite{jacobs1991adaptive}. At the same time, transformer-style token fusion provides a flexible interface for combining proprioceptive and visual observations \cite{vaswani2017attention}. Our design combines both ideas: a lightweight transformer encodes multimodal tokens, while a read-write MoE module maintains a shared recurrent latent state.
+
+\textbf{Self-supervised representation learning.}
+Cross-view consistency can encourage latent structure without relying only on direct control losses. We borrow inspiration from SwAV-style cluster consistency \cite{caron2020swav} to align routing behavior with terrain-map features over short temporal windows.
+
+\section{Parkour Task Setup}
+\subsection{Environment and terrain suite}
+The current task is built for the Unitree Go2 robot with 12 actuated joints. Training uses 8192 parallel Isaac Gym environments, a control period of 0.02\,s, and 20\,s episodes. The terrain generator creates a $10 \times 45$ curriculum grid with $10.0$\,m long and $4.0$\,m wide blocks. The active terrain style is \texttt{mgdp\_parkour}, covering the following 12 terrain identities:
+\emph{single gap, step stone, two-row stones, one-row stones, single bridge, air beams, air stones, hurdle, ramp, corridor, stairs up, and flat}. Under the current sampling proportions, 10 terrain types are active during training, while \emph{step stone} and \emph{corridor} remain defined but unsampled.
+
+\begin{figure}[t]
+    \centering
+    \placeholderfigure{Arrange representative terrain renders or top-view height maps here. Recommended layout: two rows, showing low/mid/high difficulty examples for gap, stones, bridge, hurdle, ramp, stairs, and flat, plus one proxy-depth example.}{0.16\textheight}
+    \caption{Parkour terrain suite used by the current \texttt{go2\_parkour\_moe} environment. \papercomment{Add rendered snapshots or height-map visualizations for the active terrain families, and label difficulty progression from curriculum level 0 to 9.}}
+    \label{fig:terrain_suite}
+\end{figure}
+
+Difficulty is organized as a terrain curriculum with 10 rows. Each reset updates the terrain level according to forward progress relative to the starting platform. This makes the task explicitly progression-driven: the robot is rewarded not only for local stability but also for traversing at least half of the 10\,m terrain block before difficulty increases.
+
+\subsection{Observations and action space}
+The actor observes a 45-dimensional proprioceptive vector consisting of base angular velocity, projected gravity, command input, joint position errors, joint velocities, and previous actions. The critic receives a 268-dimensional privileged vector containing base velocity, proprioception, contact and torque signals, a 187-dimensional local terrain height scan, four foot-height values, and one terrain identity label. The action space is a 12-dimensional continuous joint-position residual command executed by a PD controller.
+
+In addition to the current actor observation, the estimator receives a 10-step proprioceptive history and a two-frame proxy depth input with spatial size $58 \times 87$. The depth stream is generated by geometry-based ray casting rather than a texture-rendered camera, which makes the perception branch closely tied to terrain geometry.
+
+\subsection{Rewards and curriculum}
+The reward design combines standard locomotion terms with parkour-specific shaping. Besides velocity tracking and motion regularizers, the current task includes an upward foothold-clearance reward and a targeted-footfall touchdown reward that encourage safe swing-leg elevation and better landing placement on sparse-support terrain. Domain randomization covers friction, restitution, body mass, link mass, center-of-mass shifts, PD gains, motor offsets, motor strength, pushes, and action delay.
+
+\section{Method}
+\subsection{Overview}
+Figure~\ref{fig:framework} summarizes the proposed architecture. At each estimator update, the model fuses three inputs:
+\begin{equation}
+\mathbf{x}_t = \{\mathbf{o}_{t-H+1:t}, \mathbf{d}_{t-1:t}, m_t\},
+\end{equation}
+where $\mathbf{o}_{t-H+1:t}$ is the 10-step proprioceptive history, $\mathbf{d}_{t-1:t}$ is the two-frame proxy depth stack, and $m_t \in \{0,1\}$ is a vision-availability flag. The estimator outputs a motion-context code $\mathbf{c}_t$ that is concatenated with the current proprioceptive observation and consumed by the actor. The critic uses privileged observations during training only.
+
+\begin{figure*}[t]
+    \centering
+    \placeholderfigure{Replace with a full system diagram. Recommended blocks: (1) proprio history and proxy depth tokenization, (2) selector transformer and terrain classifier, (3) terrain-token-conditioned transformer, (4) read-write experts with shared state, (5) prediction heads for velocity / feet height / terrain map / next observation, and (6) actor-critic using the motion-context code. Annotate the exact dimensions from the code: history $10{\times}45$, depth $2{\times}58{\times}87$, token dim 64, 4 experts, $mcp$ code dim 67, actor input dim 113.}{0.21\textheight}
+    \caption{System overview of ParkourMoE. \papercomment{Make this the main method figure. A clean block diagram will carry much of the paper.}}
+    \label{fig:framework}
+\end{figure*}
+
+\subsection{Multimodal estimator and terrain selector}
+The estimator first tokenizes each modality. The proxy depth input is encoded by three convolutional layers into an $8 \times 11 \times 64$ feature map, flattened into 88 visual tokens. Each step in the proprioceptive history is mapped to a 64-dimensional token through an MLP, resulting in 10 proprioceptive tokens. A separate vision-flag token is appended, and fixed sinusoidal encodings are used for modality and position information.
+
+These tokens are passed through a transformer encoder to produce a selector feature. A terrain classification head predicts a 12-way terrain distribution:
+\begin{equation}
+\mathbf{p}^{terr}_t = \mathrm{softmax}(f_{sel}(\mathbf{z}^{sel}_t)).
+\end{equation}
+The resulting terrain distribution is embedded into a terrain token and injected back into the main transformer pass. This creates a lightweight terrain-aware perception stack where terrain identity is not treated as a post-hoc label only, but as an explicit conditioning signal for downstream routing and latent prediction.
+
+\subsection{Read-write mixture-of-experts memory}
+The core novelty of the current implementation is the read-write MoE block. Let $\mathbf{s}_{t-1}$ denote the shared latent state. After the second transformer pass, the model produces one shared pooled feature $\mathbf{h}^{ctx}_t$ and one expert-specific pooled feature $\mathbf{h}^{exp}_{t,i}$ for each of the $N=4$ experts. The router computes gating weights
+\begin{equation}
+\mathbf{g}_t = \mathrm{softmax}(f_{gate}([\mathbf{o}_t, m_t, \mathbf{h}^{ctx}_t, \phi(\mathbf{p}^{terr}_t)])),
+\end{equation}
+where $\phi(\cdot)$ is a terrain-feature encoder.
+
+Each expert reads from the shared state, updates its internal hidden feature, and writes back a shared-state delta:
+\begin{align}
+\tilde{\mathbf{h}}_{t,i} &= f^{read}_i(\mathbf{s}_{t-1}), \\
+\mathbf{u}_{t,i} &= \mathrm{GRU}_i(\mathbf{h}^{exp}_{t,i}, \tilde{\mathbf{h}}_{t,i}), \\
+\Delta \mathbf{s}_{t,i} &= f^{write}_i(\mathbf{u}_{t,i}).
+\end{align}
+The mixture of write operations is then accumulated and used to update the shared state:
+\begin{align}
+\Delta \mathbf{s}_{t} &= \sum_{i=1}^{N} g_{t,i} \Delta \mathbf{s}_{t,i}, \\
+\mathbf{s}_t &= \mathrm{LayerNorm}(\mathrm{GRU}(\Delta \mathbf{s}_{t}, \mathbf{s}_{t-1})).
+\end{align}
+
+This design differs from standard recurrent MoE variants with expert-private hidden trajectories. In ParkourMoE, the shared state acts as a continuity-preserving memory bus. As a result, terrain switches and vision-mask changes do not require abrupt jumps between disconnected recurrent states.
+
+\subsection{Predictive latent interface for control}
+From the updated shared state, a prediction head produces four control-relevant outputs:
+\begin{align}
+\hat{\mathbf{v}}_t &= f_v(\mathbf{s}_t), \\
+\hat{\mathbf{h}}^{foot}_t &= f_h(\mathbf{s}_t), \\
+(\boldsymbol{\mu}_t, \log \boldsymbol{\sigma}^2_t) &= f_z(\mathbf{s}_t), \\
+\hat{\mathbf{z}}^{map}_t &= f_m(\mathbf{s}_t),
+\end{align}
+representing base velocity, foot heights, latent proprioceptive factors, and a terrain-map latent. Auxiliary decoders reconstruct the next proprioceptive observation and the 187-dimensional local terrain scan. The motion-context code passed to the policy is
+\begin{equation}
+\mathbf{c}_t = [\hat{\mathbf{v}}_t, \hat{\mathbf{h}}^{foot}_t, \boldsymbol{\mu}_t, \hat{\mathbf{z}}^{map}_t, \mathrm{onehot}(\arg\max \mathbf{p}^{terr}_t)],
+\end{equation}
+which has dimension $3 + 4 + 16 + 32 + 12 = 67$. One additional vision-flag dimension is appended by the runner before the code is provided to the actor and critic.
+
+\subsection{Asymmetric actor-critic control}
+The actor receives the current proprioception and the motion-context code:
+\begin{equation}
+\mathbf{a}_t \sim \pi_{\theta}(\cdot \mid [\mathbf{c}_t, \mathbf{o}_t]),
+\end{equation}
+using a 3-layer MLP with hidden dimensions $512$, $256$, and $128$. The critic uses privileged training information:
+\begin{equation}
+V_{\psi}([\mathbf{o}^{priv}_t, m_t]).
+\end{equation}
+This asymmetric design keeps deployment inputs compact while still benefiting from richer training-time supervision.
+
+\subsection{Training objectives}
+The policy is trained with PPO \cite{schulman2017ppo}. The estimator is optimized jointly with auxiliary predictive and regularization losses:
+\begin{align}
+\mathcal{L}_{est} = &\ \mathcal{L}_{vel}
++ \mathcal{L}_{foot}
++ \mathcal{L}_{map}
++ \mathcal{L}_{next\_obs}
++ \lambda_{tid}\mathcal{L}_{terrain\_id} \nonumber \\
+&+ \lambda_{kl}\mathcal{L}_{kl}
++ \lambda_{lb}\mathcal{L}_{lb}
++ \lambda_{swav}\mathcal{L}_{swav}.
+\end{align}
+The current code uses mean-squared error for velocity, foot-height, terrain-map, and next-observation prediction; cross-entropy for terrain identity; KL regularization on the latent Gaussian; a routing load-balance term; and a cross-view SwAV-style loss relating short windows of routing weights and terrain-map predictions. The KL and SwAV terms are warmed up progressively during training.
+
+In parallel, a separate depth autoencoder is trained with reconstruction loss on the proxy depth stream. The autoencoder's reconstruction error is intended to support vision gating at inference time, although the actual line that disables vision online is currently commented out in the release code. We therefore treat runtime selector gating as an optional experiment rather than a default claim.
+
+\section{Experiments}
+\subsection{Experimental protocol}
+All experiments should be conducted with the current task configuration: 8192 parallel environments, 24 steps per environment per rollout, PPO with 5 epochs and 4 mini-batches, learning rate $2\times10^{-4}$ for the actor-critic, and separate learning rates of $10^{-3}$ for both the estimator and the depth autoencoder. The terrain curriculum, domain randomization, and reward settings should remain unchanged unless explicitly ablated.
+
+We recommend reporting the following metrics.
+\begin{itemize}
+    \item \textbf{Traversal success rate:} fraction of trials that reach the end of a terrain block without reset.
+    \item \textbf{Normalized forward progress:} traveled distance divided by terrain length.
+    \item \textbf{Fall rate and no-progress rate:} useful for separating dynamic failures from indecisive behavior.
+    \item \textbf{Command tracking error:} especially on flat and easy terrain.
+    \item \textbf{Vision robustness:} performance under masked or corrupted proxy depth.
+    \item \textbf{Optional hardware success rate:} per obstacle family on real Go2 trials.
+\end{itemize}
+
+\subsection{Baselines and ablations}
+Table~\ref{tab:main_results} is intended for the main comparison, while Table~\ref{tab:ablation} focuses on ablations that are directly motivated by the current codebase. The following baselines are the most practical and informative:
+\begin{enumerate}
+    \item \textbf{Blind PPO baseline.} Remove the depth branch and train a proprioceptive parkour controller.
+    \item \textbf{Single-expert variant.} Keep the estimator architecture but set \texttt{expert\_num=1}, which tests whether expert specialization is useful.
+    \item \textbf{No terrain-token variant.} Remove terrain prediction and terrain-token conditioning, but keep the rest of the estimator.
+    \item \textbf{No shared-state routing regularization.} Disable load-balancing and SwAV consistency to test whether routing quality matters.
+    \item \textbf{No vision-toggle training.} Keep visual input always enabled during training to test robustness degradation on easy terrains.
+    \item \textbf{Full ParkourMoE.} The current implementation with all active losses and curriculum settings.
+\end{enumerate}
+
+\begin{table*}[t]
+    \centering
+    \caption{Main quantitative comparison on the parkour benchmark. \papercomment{Fill each cell with mean $\pm$ std over at least 3 seeds. Report per-terrain success and an overall average.}}
+    \label{tab:main_results}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{lccccccccccccc}
+        \toprule
+        Method & Gap & Two-row & One-row & Bridge & Air-beams & Air-stones & Hurdle & Ramp & Stairs & Flat & Avg. success & Avg. progress & Fall rate & No-progress rate \\
+        \midrule
+        Blind PPO & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+        Single expert & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+        No terrain token & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+        No routing regularization & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+        No vision-toggle training & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+        Full ParkourMoE & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+        \bottomrule
+    \end{tabular}}
+\end{table*}
+
+\begin{table}[t]
+    \centering
+    \caption{Ablation study on key components of ParkourMoE. \papercomment{Use either average success/progress only, or restrict to the hardest 4 terrain families for a compact RA-L table.}}
+    \label{tab:ablation}
+    \begin{tabular}{lcc}
+        \toprule
+        Variant & Avg. success & Avg. progress \\
+        \midrule
+        Full model & -- & -- \\
+        w/o terrain selector & -- & -- \\
+        w/o read-write experts & -- & -- \\
+        w/o terrain-map reconstruction & -- & -- \\
+        w/o terrain-ID supervision & -- & -- \\
+        w/o SwAV consistency & -- & -- \\
+        w/o load balancing & -- & -- \\
+        w/o vision-toggle training & -- & -- \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsection{Qualitative and representation analysis}
+Besides aggregate performance, this framework should be analyzed qualitatively. The current repository already contains a t-SNE visualization script for gating weights and latent terrain embeddings, which makes it natural to include representation plots in the paper.
+
+\begin{figure}[t]
+    \centering
+    \placeholderfigure{Use this slot for a qualitative rollout figure. Recommended content: top row with proxy depth, middle row with rendered robot traversing gap/beam/stairs/hurdle, bottom row with predicted foothold map or reconstructed terrain profile.}{0.15\textheight}
+    \caption{Qualitative traversal examples. \papercomment{Capture 3--4 terrain families and include failure cases if space allows.}}
+    \label{fig:qualitative}
+\end{figure}
+
+\begin{figure}[t]
+    \centering
+    \placeholderfigure{Use this slot for representation plots. Recommended layout: left, t-SNE of gating weights colored by predicted terrain; right, t-SNE of latent $z_t$ or terrain-map embeddings colored by actual terrain. The repository already includes \texttt{legged\_gym/scripts/plot\_terrain\_gate\_zt\_tsne.py}.}{0.15\textheight}
+    \caption{Representation analysis of routing and latent structure. \papercomment{These plots are especially useful for explaining why the MoE is not collapsing into a single expert.}}
+    \label{fig:tsne}
+\end{figure}
+
+\subsection{Recommended robustness experiments}
+Two robustness experiments are especially important for this paper.
+
+\textbf{Vision degradation test.}
+Because the code explicitly trains with vision masking on easy terrain, the paper should report performance under (i) normal proxy depth, (ii) fully masked depth, and (iii) corrupted depth with random occlusions or dropout. This validates whether ParkourMoE actually learned a fallback control mode.
+
+\textbf{Terrain generalization test.}
+Since two terrain classes are currently defined but unsampled, a useful extension is to evaluate whether the learned latent interface transfers to held-out difficulty distributions or re-enabled terrain families such as \emph{step stone} and \emph{corridor}. \papercomment{If you do not run this experiment, remove the claim from the final draft.}
+
+\subsection{Optional sim-to-real experiment}
+The repository already contains deployment paths for MuJoCo and real-robot inference bundles. If hardware data is available, the cleanest RA-L presentation is a compact table with three to five repeated trials per obstacle family and a short qualitative figure. If real-robot testing is not ready, keep this subsection brief and frame it as future work rather than a finished result.
+
+\section{Discussion and Limitations}
+The current ParkourMoE implementation is strong enough to support a method paper, but several details should be stated honestly. First, two terrain classes are still unsampled under the current training proportions, so the terrain classifier is trained with partial label support. Second, the inference-time depth-autoencoder selector is implemented as an interface but is not activated by default in the current code. Third, the terrain-aware latent interface is supervised through privileged signals, which improves learning efficiency but makes pure end-to-end interpretation less direct.
+
+Despite these limitations, the design offers an appealing compromise between structure and flexibility. The estimator is compact, the routing mechanism is interpretable, the actor input remains deployment-friendly, and the current codebase already exposes enough internal signals for meaningful ablation and representation analysis.
+
+\section{Conclusion}
+This paper drafts a RA-L-style manuscript around the current \texttt{parkour\_moe} framework for visuo-proprioceptive quadruped parkour. The central idea is to bridge terrain-aware expert specialization and temporal continuity through a shared read-write latent state, then expose the resulting predictive motion-context code to an asymmetric locomotion policy. The accompanying environment, reward shaping, and training objectives make the method a cohesive parkour learning system rather than a standalone network module. With the quantitative tables, terrain figures, and robustness experiments filled in, the manuscript can be directly refined into a submission-ready paper.
+
+\balance
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}

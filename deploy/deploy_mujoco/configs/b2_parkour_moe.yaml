@@ -1,0 +1,175 @@
+policy_type: "parkour_moe_bundle"
+policy_path: "{LEGGED_GYM_ROOT_DIR}/logs/b2_parkour_moe/exported/policies/parkour_moe_inference_bundle.pt"
+
+# Choose any B2 scene under resources/robots/b2:
+# [parkour_hard_line, step_stone, two_row_stones, one_row_stones, single_bridge,
+#  air_beams, hurdle, air_stones, cross_stairs, corridor, jump_gap, flat,
+#  rough_flat, race_track, stairs, cross_slope]
+#xml_path: "{LEGGED_GYM_ROOT_DIR}/resources/robots/b2/parkour_hard_line.xml"
+#xml_path: "{LEGGED_GYM_ROOT_DIR}/resources/robots/b2/step_stone.xml"
+#xml_path: "{LEGGED_GYM_ROOT_DIR}/resources/robots/b2/two_row_stones.xml"
+#xml_path: "{LEGGED_GYM_ROOT_DIR}/resources/robots/b2/one_row_stones.xml"
+#xml_path: "{LEGGED_GYM_ROOT_DIR}/resources/robots/b2/single_bridge.xml"
+#xml_path: "{LEGGED_GYM_ROOT_DIR}/resources/robots/b2/air_beams.xml"
+#xml_path: "{LEGGED_GYM_ROOT_DIR}/resources/robots/b2/hurdle.xml"
+#xml_path: "{LEGGED_GYM_ROOT_DIR}/resources/robots/b2/air_stones.xml"
+#xml_path: "{LEGGED_GYM_ROOT_DIR}/resources/robots/b2/cross_stairs.xml"
+#xml_path: "{LEGGED_GYM_ROOT_DIR}/resources/robots/b2/corridor.xml"
+#xml_path: "{LEGGED_GYM_ROOT_DIR}/resources/robots/b2/jump_gap.xml"
+xml_path: "{LEGGED_GYM_ROOT_DIR}/resources/robots/b2/rough_flat.xml"
+#xml_path: "{LEGGED_GYM_ROOT_DIR}/resources/robots/b2/flat.xml"
+#xml_path: "{LEGGED_GYM_ROOT_DIR}/resources/robots/b2/race_track.xml"
+#xml_path: "{LEGGED_GYM_ROOT_DIR}/resources/robots/b2/stairs.xml"
+#xml_path: "{LEGGED_GYM_ROOT_DIR}/resources/robots/b2/cross_slope.xml"
+
+device: "cuda"
+
+simulation_duration: 60000000.0
+simulation_dt: 0.002
+control_decimation: 10
+
+kps: [80.0, 80.0, 80.0, 80.0, 80.0, 80.0, 80.0, 80.0, 80.0, 80.0, 80.0, 80.0]
+kds: [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0]
+
+default_angles: [0.1, 0.8, -1.5, -0.1, 0.8, -1.5,
+                 0.1, 1.0, -1.5, -0.1, 1.0, -1.5]
+
+lin_vel_scale: 2.0
+ang_vel_scale: 0.25
+dof_pos_scale: 1.0
+dof_vel_scale: 0.05
+action_scale: 0.25
+joint_target_limits:
+  enabled: true
+  margin: 0.03
+cmd_scale: [2.0, 2.0, 0.25]
+num_actions: 12
+num_obs: 45
+max_cmd: [1.2, 0.8, 1.0]
+
+cmd_init: [0.8, 0.0, 0.0]
+
+depth_preview:
+  enabled: true
+  size: [480, 320]
+  token_overlay:
+    enabled: true
+    alpha: 0.45
+    show_grid: true
+    show_random_dropout: true
+    show_padding_mask: true
+    show_structured_protection: true
+    show_confidence: false
+    structured_protection_color_bgr: [0, 220, 0]
+  active_token_overlay:
+    enabled: true
+    radius: 4
+    show_count: true
+    valid_color_bgr: [255, 240, 40]
+    invalid_color_bgr: [150, 150, 150]
+
+recon_scan:
+  enabled: true
+  radius: 0.012
+  rgba: [0.95, 0.45, 0.10, 1.0]
+  height_measurements_scale: 2.5
+  base_height_offset: 0.55
+  z_offset: 0.035
+  measured_points_x: [-0.5, -0.375, -0.25, -0.125, 0.0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1.0, 1.125, 1.25, 1.375, 1.5]
+  measured_points_y: [-0.625, -0.5, -0.375, -0.25, -0.125, 0.0, 0.125, 0.25, 0.375, 0.5, 0.625]
+
+camera:
+  enabled: true
+  camera_name: "policy_depth_camera"
+  convention: "ros"
+  update_interval: 5
+  buffer_len: 1
+  focal_length: 11.041
+  horizontal_aperture: 20.955
+  vertical_aperture: 12.240
+  horizontal_fov: 87.0
+  raw_height: 60
+  raw_width: 106
+  output_height: 58
+  output_width: 87
+  crop_top: 0
+  crop_bottom: 2
+  crop_left: 4
+  crop_right: 4
+  clipping_range: 2.0
+  attach_body: "base"
+  local_pos: [0.42, 0.0, 0.10]
+  local_euler_xyz: [3.141592653589793, 1.1344640137963142, -1.5707963267948966]
+  depth_format: "distance"
+  flip_vertical: false
+  flip_horizontal: false
+  gaussian_noise:
+    enabled: true
+    probability: 1.0
+    std: 0.03
+  reflective_noise:
+    enabled: true
+    probability: 1.0
+    min_blocks: 3
+    max_blocks: 4
+    min_size: [5, 10]
+    max_size: [10, 22]
+    shape: "irregular"
+    roughness: 1.0
+    mode: "far"
+    blend_alpha: 1.0
+  manual_vision_flag: true
+  use_confidence_mask: true
+  token_confidence_threshold: 0.995
+  bad_token_ratio_threshold: 0.4
+  random_token_dropout:
+    enabled: false
+    mode: "spatial_block"
+    min: 0.40
+    max: 0.50
+  structured_token_protection:
+    enabled: true
+    sobel_threshold: 0.40
+    keep_margin: 0.02
+    orientation_consistency_threshold: 0.72
+    min_support_neighbors: 1
+    min_protected_ratio: 0.04
+    max_protected_ratio: 0.40
+    dilate: 0
+  token_mask_debug:
+    enabled: true
+    print_interval: 10
+  inference_timing:
+    enabled: true
+    print_interval: 50
+    cuda_synchronize: true
+
+mujoco_joint_names: [
+  "FL_hip_joint",
+  "FL_thigh_joint",
+  "FL_calf_joint",
+  "FR_hip_joint",
+  "FR_thigh_joint",
+  "FR_calf_joint",
+  "RL_hip_joint",
+  "RL_thigh_joint",
+  "RL_calf_joint",
+  "RR_hip_joint",
+  "RR_thigh_joint",
+  "RR_calf_joint"
+]
+
+model_joint_names: [
+  "FL_hip_joint",
+  "FL_thigh_joint",
+  "FL_calf_joint",
+  "FR_hip_joint",
+  "FR_thigh_joint",
+  "FR_calf_joint",
+  "RL_hip_joint",
+  "RL_thigh_joint",
+  "RL_calf_joint",
+  "RR_hip_joint",
+  "RR_thigh_joint",
+  "RR_calf_joint"
+]

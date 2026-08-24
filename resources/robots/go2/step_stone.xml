@@ -1,0 +1,63 @@
+<mujoco model="step_stone_cross_1_4_7_10">
+  <include file="go2.xml"/>
+  <!-- Terrain: Cross Step Stone.
+       The four branches approximate MGDP parkour levels 1 / 4 / 7 / 10
+       using representative difficulties 0.1 / 0.4 / 0.7 / 0.9. -->
+  <statistic center="0 0 0.12" extent="0.9" />
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0" />
+    <rgba haze="0.15 0.25 0.35 1" />
+    <global azimuth="-130" elevation="-20" />
+  </visual>
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072" />
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.18 0.22 0.28" rgb2="0.10 0.14 0.18" markrgb="0.8 0.8 0.8" width="300" height="300" />
+    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.0" />
+    <texture name="tex_label_1" type="2d" file="./imgs/label_1.png" />
+    <material name="mat_label_1" texture="tex_label_1" specular="0" shininess="0" emission="1" texrepeat="1 1" rgba="1 1 1 1" />
+    <texture name="tex_label_7" type="2d" file="./imgs/label_7.png" />
+    <material name="mat_label_7" texture="tex_label_7" specular="0" shininess="0" emission="1" texrepeat="1 1" rgba="1 1 1 1" />
+    <texture name="tex_label_10" type="2d" file="./imgs/label_10.png" />
+    <material name="mat_label_10" texture="tex_label_10" specular="0" shininess="0" emission="1" texrepeat="1 1" rgba="1 1 1 1" />
+    <texture name="tex_label_4" type="2d" file="./imgs/label_4.png" />
+    <material name="mat_label_4" texture="tex_label_4" specular="0" shininess="0" emission="1" texrepeat="1 1" rgba="1 1 1 1" />
+  </asset>
+  <worldbody>
+    <light pos="0 0 1.5" dir="0 0 -1" directional="true" />
+
+    <geom name="pit_floor" pos="0 0 -1.25" size="20 20 0.10" type="box" material="groundplane" />
+    <geom name="hub" pos="0 0 -0.60" type="box" size="0.90 0.90 0.60" rgba="0.40 0.41 0.44 1" />
+
+    <!-- neg_x direction, level 1, difficulty=0.1, step_stone -->
+    <geom name="neg_x_stone_1" pos="-1.27 0 -0.5864" type="box" size="0.35 0.245 0.6136" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_x_stone_2" pos="-1.94 -0.12 -0.57552" type="box" size="0.35 0.245 0.62448" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_x_stone_3" pos="-2.61 0.08 -0.566" type="box" size="0.35 0.245 0.634" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_x_stone_4" pos="-3.28 -0.1 -0.5813" type="box" size="0.35 0.245 0.6187" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_x_landing" pos="-3.995 0 -0.6" type="box" size="0.425 0.29 0.6" rgba="0.42 0.42 0.44 1" />
+    <geom name="neg_x_label" pos="-0.62 0 0.002" type="box" size="0.18 0.10 0.0001" contype="0" conaffinity="0" group="1" material="mat_label_1" rgba="1 1 1 1" />
+
+    <!-- pos_y direction, level 7, difficulty=0.7, step_stone -->
+    <geom name="pos_y_stone_1" pos="0 1.3775 -0.5648" type="box" size="0.15925 0.2275 0.6352" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_y_stone_2" pos="-0.12 2.0325 -0.53664" type="box" size="0.15925 0.2275 0.66336" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_y_stone_3" pos="0.08 2.6875 -0.512" type="box" size="0.15925 0.2275 0.688" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_y_stone_4" pos="-0.1 3.3425 -0.5516" type="box" size="0.15925 0.2275 0.6484" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_y_landing" pos="0 4.165 -0.6" type="box" size="0.29 0.425 0.6" rgba="0.42 0.42 0.44 1" />
+    <geom name="pos_y_label" pos="0 0.62 0.002" type="box" size="0.10 0.18 0.0001" quat="0.7071067811865476 0 0 0.7071067811865475" contype="0" conaffinity="0" group="1" material="mat_label_7" rgba="1 1 1 1" />
+
+    <!-- pos_x direction, level 10, difficulty=0.9, step_stone -->
+    <geom name="pos_x_stone_1" pos="1.3775 0 -0.5576" type="box" size="0.1475 0.30 0.6424" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_x_stone_2" pos="1.9525 0.12 -0.52368" type="box" size="0.1475 0.30 0.67632" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_x_stone_3" pos="2.5275 -0.08 -0.494" type="box" size="0.1475 0.3014 0.606" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_x_stone_4" pos="3.1025 0.1 -0.5417" type="box" size="0.1475 0.30 0.6583" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_x_landing" pos="3.925 0 -0.6" type="box" size="0.425 0.29 0.6" rgba="0.42 0.42 0.44 1" />
+    <geom name="pos_x_label" pos="0.62 0 0.002" type="box" size="0.18 0.10 0.0001" contype="0" conaffinity="0" group="1" material="mat_label_10" rgba="1 1 1 1" />
+
+    <!-- neg_y direction, level 4, difficulty=0.4, step_stone -->
+    <geom name="neg_y_stone_1" pos="0 -1.34 -0.5756" type="box" size="0.217 0.31 0.6244" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_y_stone_2" pos="0.12 -2.04 -0.55608" type="box" size="0.217 0.31 0.64392" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_y_stone_3" pos="-0.08 -2.74 -0.539" type="box" size="0.217 0.31 0.661" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_y_stone_4" pos="0.1 -3.44 -0.56645" type="box" size="0.217 0.31 0.63355" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_y_landing" pos="0 -4.225 -0.6" type="box" size="0.29 0.425 0.6" rgba="0.42 0.42 0.44 1" />
+    <geom name="neg_y_label" pos="0 -0.62 0.002" type="box" size="0.10 0.18 0.0001" quat="0.7071067811865476 0 0 -0.7071067811865475" contype="0" conaffinity="0" group="1" material="mat_label_4" rgba="1 1 1 1" />
+  </worldbody>
+</mujoco>

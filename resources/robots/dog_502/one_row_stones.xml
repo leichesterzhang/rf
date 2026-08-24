@@ -1,0 +1,121 @@
+<mujoco model="one_row_stones_cross_1_4_7_10">
+  <include file="dog_502.xml"/>
+  <!-- Terrain: Cross One Row Stones.
+       Matches the current gym-side one_row_stones generator in
+       legged_gym/utils/terrain_mgdp.py:
+       gap_range=[0.1, 0.35], max-difficulty x size=0.1, pitch=0.45,
+       platform_size=2.0, depth=0.6. Because training uses a 0.05 m
+       heightfield grid, the effective forward lengths represented here are
+       about 0.35 / 0.25 / 0.25 / 0.15 m for difficulties
+       0.1 / 0.4 / 0.7 / 0.9. Lateral widths are deterministic
+       representative draws from the 0.6-1.45 m training range. -->
+  <statistic center="0 0 0.12" extent="1.35" />
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0" />
+    <rgba haze="0.15 0.25 0.35 1" />
+    <global azimuth="-130" elevation="-20" />
+  </visual>
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072" />
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.18 0.22 0.28" rgb2="0.10 0.14 0.18" markrgb="0.8 0.8 0.8" width="300" height="300" />
+    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.0" />
+    <texture name="tex_label_1" type="2d" file="./imgs/label_1.png" />
+    <material name="mat_label_1" texture="tex_label_1" specular="0" shininess="0" emission="1" texrepeat="1 1" rgba="1 1 1 1" />
+    <texture name="tex_label_7" type="2d" file="./imgs/label_7.png" />
+    <material name="mat_label_7" texture="tex_label_7" specular="0" shininess="0" emission="1" texrepeat="1 1" rgba="1 1 1 1" />
+    <texture name="tex_label_10" type="2d" file="./imgs/label_10.png" />
+    <material name="mat_label_10" texture="tex_label_10" specular="0" shininess="0" emission="1" texrepeat="1 1" rgba="1 1 1 1" />
+    <texture name="tex_label_4" type="2d" file="./imgs/label_4.png" />
+    <material name="mat_label_4" texture="tex_label_4" specular="0" shininess="0" emission="1" texrepeat="1 1" rgba="1 1 1 1" />
+  </asset>
+  <worldbody>
+    <light pos="0 0 1.5" dir="0 0 -1" directional="true" />
+
+    <geom name="pit_floor" pos="0 0 -1.25" size="20 20 0.10" type="box" material="groundplane" />
+    <geom name="hub" pos="0 0 -0.60" type="box" size="1.00 1.00 0.60" rgba="0.40 0.41 0.44 1" />
+
+    <!-- neg_x direction, level 1, difficulty=0.1, one_row_stones -->
+    <geom name="neg_x_stone_01" pos="-1.225 0 -0.5975" type="box" size="0.175 0.600 0.6025" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_x_stone_02" pos="-1.675 0 -0.5900" type="box" size="0.175 0.450 0.6100" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_x_stone_03" pos="-2.125 0 -0.5825" type="box" size="0.175 0.650 0.6175" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_x_stone_04" pos="-2.575 0 -0.5750" type="box" size="0.175 0.375 0.6250" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_x_stone_05" pos="-3.025 0 -0.5900" type="box" size="0.175 0.550 0.6100" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_x_stone_06" pos="-3.475 0 -0.5825" type="box" size="0.175 0.325 0.6175" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_x_stone_07" pos="-3.925 0 -0.5975" type="box" size="0.175 0.700 0.6025" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_x_stone_08" pos="-4.375 0 -0.5750" type="box" size="0.175 0.500 0.6250" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_x_stone_09" pos="-4.825 0 -0.5975" type="box" size="0.175 0.400 0.6025" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_x_stone_10" pos="-5.275 0 -0.5900" type="box" size="0.175 0.625 0.6100" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_x_stone_11" pos="-5.725 0 -0.5825" type="box" size="0.175 0.475 0.6175" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_x_stone_12" pos="-6.175 0 -0.5750" type="box" size="0.175 0.675 0.6250" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_x_stone_13" pos="-6.625 0 -0.5900" type="box" size="0.175 0.350 0.6100" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_x_stone_14" pos="-7.075 0 -0.5825" type="box" size="0.175 0.575 0.6175" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_x_stone_15" pos="-7.525 0 -0.5975" type="box" size="0.175 0.425 0.6025" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_x_stone_16" pos="-7.975 0 -0.5750" type="box" size="0.175 0.725 0.6250" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_x_stone_17" pos="-8.425 0 -0.5900" type="box" size="0.175 0.525 0.6100" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_x_stone_18" pos="-8.875 0 -0.5825" type="box" size="0.175 0.300 0.6175" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_x_label" pos="-0.62 0 0.002" type="box" size="0.18 0.10 0.0001" contype="0" conaffinity="0" group="1" material="mat_label_1" rgba="1 1 1 1" />
+
+    <!-- pos_y direction, level 7, difficulty=0.7, one_row_stones -->
+    <geom name="pos_y_stone_01" pos="0 1.225 -0.5975" type="box" size="0.600 0.125 0.6025" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_y_stone_02" pos="0 1.675 -0.5675" type="box" size="0.450 0.125 0.6325" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_y_stone_03" pos="0 2.125 -0.5975" type="box" size="0.650 0.125 0.6025" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_y_stone_04" pos="0 2.575 -0.5675" type="box" size="0.375 0.125 0.6325" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_y_stone_05" pos="0 3.025 -0.5975" type="box" size="0.550 0.125 0.6025" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_y_stone_06" pos="0 3.475 -0.5675" type="box" size="0.325 0.125 0.6325" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_y_stone_07" pos="0 3.925 -0.5975" type="box" size="0.700 0.125 0.6025" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_y_stone_08" pos="0 4.375 -0.5675" type="box" size="0.500 0.125 0.6325" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_y_stone_09" pos="0 4.825 -0.5975" type="box" size="0.400 0.125 0.6025" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_y_stone_10" pos="0 5.275 -0.5675" type="box" size="0.625 0.125 0.6325" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_y_stone_11" pos="0 5.725 -0.5975" type="box" size="0.475 0.125 0.6025" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_y_stone_12" pos="0 6.175 -0.5675" type="box" size="0.675 0.125 0.6325" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_y_stone_13" pos="0 6.625 -0.5975" type="box" size="0.350 0.125 0.6025" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_y_stone_14" pos="0 7.075 -0.5675" type="box" size="0.575 0.125 0.6325" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_y_stone_15" pos="0 7.525 -0.5975" type="box" size="0.425 0.125 0.6025" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_y_stone_16" pos="0 7.975 -0.5675" type="box" size="0.725 0.125 0.6325" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_y_stone_17" pos="0 8.425 -0.5975" type="box" size="0.525 0.125 0.6025" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_y_stone_18" pos="0 8.875 -0.5675" type="box" size="0.300 0.125 0.6325" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_y_label" pos="0 0.62 0.002" type="box" size="0.10 0.18 0.0001" quat="0.7071067811865476 0 0 0.7071067811865475" contype="0" conaffinity="0" group="1" material="mat_label_7" rgba="1 1 1 1" />
+
+    <!-- pos_x direction, level 10, difficulty=0.9, one_row_stones -->
+    <geom name="pos_x_stone_01" pos="1.225 0 -0.5975" type="box" size="0.075 0.600 0.6025" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_x_stone_02" pos="1.675 0 -0.5675" type="box" size="0.075 0.450 0.6325" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_x_stone_03" pos="2.125 0 -0.5975" type="box" size="0.075 0.650 0.6025" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_x_stone_04" pos="2.575 0 -0.5675" type="box" size="0.075 0.375 0.6325" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_x_stone_05" pos="3.025 0 -0.5975" type="box" size="0.075 0.550 0.6025" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_x_stone_06" pos="3.475 0 -0.5675" type="box" size="0.075 0.325 0.6325" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_x_stone_07" pos="3.925 0 -0.5975" type="box" size="0.075 0.700 0.6025" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_x_stone_08" pos="4.375 0 -0.5675" type="box" size="0.075 0.500 0.6325" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_x_stone_09" pos="4.825 0 -0.5975" type="box" size="0.075 0.400 0.6025" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_x_stone_10" pos="5.275 0 -0.5675" type="box" size="0.075 0.625 0.6325" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_x_stone_11" pos="5.725 0 -0.5975" type="box" size="0.075 0.475 0.6025" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_x_stone_12" pos="6.175 0 -0.5675" type="box" size="0.075 0.675 0.6325" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_x_stone_13" pos="6.625 0 -0.5975" type="box" size="0.075 0.350 0.6025" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_x_stone_14" pos="7.075 0 -0.5675" type="box" size="0.075 0.575 0.6325" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_x_stone_15" pos="7.525 0 -0.5975" type="box" size="0.075 0.425 0.6025" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_x_stone_16" pos="7.975 0 -0.5675" type="box" size="0.075 0.725 0.6325" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_x_stone_17" pos="8.425 0 -0.5975" type="box" size="0.075 0.525 0.6025" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_x_stone_18" pos="8.875 0 -0.5675" type="box" size="0.075 0.300 0.6325" rgba="0.55 0.52 0.47 1" />
+    <geom name="pos_x_label" pos="0.62 0 0.002" type="box" size="0.18 0.10 0.0001" contype="0" conaffinity="0" group="1" material="mat_label_10" rgba="1 1 1 1" />
+
+    <!-- neg_y direction, level 4, difficulty=0.4, one_row_stones -->
+    <geom name="neg_y_stone_01" pos="0 -1.225 -0.5975" type="box" size="0.600 0.125 0.6025" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_y_stone_02" pos="0 -1.675 -0.5875" type="box" size="0.450 0.125 0.6125" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_y_stone_03" pos="0 -2.125 -0.5775" type="box" size="0.650 0.125 0.6225" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_y_stone_04" pos="0 -2.575 -0.5675" type="box" size="0.375 0.125 0.6325" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_y_stone_05" pos="0 -3.025 -0.5575" type="box" size="0.550 0.125 0.6425" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_y_stone_06" pos="0 -3.475 -0.5875" type="box" size="0.325 0.125 0.6125" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_y_stone_07" pos="0 -3.925 -0.5775" type="box" size="0.700 0.125 0.6225" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_y_stone_08" pos="0 -4.375 -0.5675" type="box" size="0.500 0.125 0.6325" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_y_stone_09" pos="0 -4.825 -0.5575" type="box" size="0.400 0.125 0.6425" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_y_stone_10" pos="0 -5.275 -0.5975" type="box" size="0.625 0.125 0.6025" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_y_stone_11" pos="0 -5.725 -0.5875" type="box" size="0.475 0.125 0.6125" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_y_stone_12" pos="0 -6.175 -0.5775" type="box" size="0.675 0.125 0.6225" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_y_stone_13" pos="0 -6.625 -0.5675" type="box" size="0.350 0.125 0.6325" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_y_stone_14" pos="0 -7.075 -0.5575" type="box" size="0.575 0.125 0.6425" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_y_stone_15" pos="0 -7.525 -0.5975" type="box" size="0.425 0.125 0.6025" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_y_stone_16" pos="0 -7.975 -0.5875" type="box" size="0.725 0.125 0.6125" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_y_stone_17" pos="0 -8.425 -0.5775" type="box" size="0.525 0.125 0.6225" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_y_stone_18" pos="0 -8.875 -0.5675" type="box" size="0.300 0.125 0.6325" rgba="0.55 0.52 0.47 1" />
+    <geom name="neg_y_label" pos="0 -0.62 0.002" type="box" size="0.10 0.18 0.0001" quat="0.7071067811865476 0 0 -0.7071067811865475" contype="0" conaffinity="0" group="1" material="mat_label_4" rgba="1 1 1 1" />
+  </worldbody>
+</mujoco>

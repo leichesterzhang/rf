@@ -1,0 +1,59 @@
+# Local agent metadata and alternate Git metadata
+/.agents/
+/.codex/
+/.gitdata/
+/.git-local/
+
+# Secrets and local environment files
+/密钥.txt
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Training runs, checkpoints, and experiment tracking
+/logs/
+/action_data/
+/runs/
+/wandb/
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.engine
+*.plan
+*.pkl
+
+# Generated archives and reports
+*.zip
+*.tar
+*.tar.gz
+*.7z
+/html/
+/error.txt
+/MUJOCO_LOG.TXT
+/RM75/export.log
+
+# Python caches and build products
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+/build/
+/dist/
+/rsl_rl/build/
+/tmp/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Editor and operating-system files
+.idea/
+.vscode/
+*~
+*.swp
+.DS_Store
+Thumbs.db

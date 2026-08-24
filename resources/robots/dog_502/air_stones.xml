@@ -1,0 +1,51 @@
+<mujoco model="air_stones_cross_1_4_7_10">
+  <include file="dog_502.xml"/>
+  <!-- Terrain: Cross Air Stones.
+       This approximates the gym-side air_stones terrain as four ground lanes
+       with suspended overhead platforms for levels 1 / 4 / 7 / 10. -->
+  <statistic center="0 0 0.18" extent="1.1" />
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0" />
+    <rgba haze="0.15 0.25 0.35 1" />
+    <global azimuth="-130" elevation="-20" />
+  </visual>
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072" />
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.18 0.22 0.28" rgb2="0.10 0.14 0.18" markrgb="0.8 0.8 0.8" width="300" height="300" />
+    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.0" />
+    <texture name="tex_label_1" type="2d" file="./imgs/label_1.png" />
+    <material name="mat_label_1" texture="tex_label_1" specular="0" shininess="0" emission="1" texrepeat="1 1" rgba="1 1 1 1" />
+    <texture name="tex_label_7" type="2d" file="./imgs/label_7.png" />
+    <material name="mat_label_7" texture="tex_label_7" specular="0" shininess="0" emission="1" texrepeat="1 1" rgba="1 1 1 1" />
+    <texture name="tex_label_10" type="2d" file="./imgs/label_10.png" />
+    <material name="mat_label_10" texture="tex_label_10" specular="0" shininess="0" emission="1" texrepeat="1 1" rgba="1 1 1 1" />
+    <texture name="tex_label_4" type="2d" file="./imgs/label_4.png" />
+    <material name="mat_label_4" texture="tex_label_4" specular="0" shininess="0" emission="1" texrepeat="1 1" rgba="1 1 1 1" />
+  </asset>
+  <worldbody>
+    <light pos="0 0 1.5" dir="0 0 -1" directional="true" />
+
+    <geom name="pit_floor" pos="0 0 -1.25" size="20 20 0.10" type="box" material="groundplane" />
+    <geom name="hub" pos="0 0 -0.60" type="box" size="0.90 0.90 0.60" rgba="0.40 0.41 0.44 1" />
+
+    <!-- Neg-X direction, level 1, difficulty~0.1, clearance~0.47 m -->
+    <geom name="neg_x_lane" pos="-4.5 0 -0.60" type="box" size="3.60 1.00 0.60" rgba="0.44 0.44 0.46 1" />
+    <geom name="neg_x_air_stone" pos="-5.0 0 0.7225" type="box" size="2.25 0.95 0.25" rgba="0.70 0.71 0.73 1" />
+    <geom name="neg_x_label" pos="-1.35 0 0.002" type="box" size="0.18 0.10 0.0001" contype="0" conaffinity="0" group="1" material="mat_label_1" rgba="1 1 1 1" />
+
+    <!-- Pos-Y direction, level 7, difficulty~0.7, clearance~0.31 m -->
+    <geom name="pos_y_lane" pos="0 4.5 -0.60" type="box" size="1.00 3.60 0.60" rgba="0.44 0.44 0.46 1" />
+    <geom name="pos_y_air_stone" pos="0 5.0 0.5555" type="box" size="1.10 2.25 0.25" rgba="0.70 0.71 0.73 1" />
+    <geom name="pos_y_label" pos="0 1.35 0.002" type="box" size="0.10 0.18 0.0001" quat="0.7071067811865476 0 0 0.7071067811865475" contype="0" conaffinity="0" group="1" material="mat_label_7" rgba="1 1 1 1" />
+
+    <!-- Pos-X direction, level 10, difficulty~0.9, clearance~0.25 m -->
+    <geom name="pos_x_lane" pos="4.5 0 -0.60" type="box" size="3.60 1.00 0.60" rgba="0.44 0.44 0.46 1" />
+    <geom name="pos_x_air_stone" pos="5.0 0 0.50" type="box" size="2.25 1.20 0.25" rgba="0.70 0.71 0.73 1" />
+    <geom name="pos_x_label" pos="1.35 0 0.002" type="box" size="0.18 0.10 0.0001" contype="0" conaffinity="0" group="1" material="mat_label_10" rgba="1 1 1 1" />
+
+    <!-- Neg-Y direction, level 4, difficulty~0.4, clearance~0.39 m -->
+    <geom name="neg_y_lane" pos="0 -4.5 -0.60" type="box" size="1.00 3.60 0.60" rgba="0.44 0.44 0.46 1" />
+    <geom name="neg_y_air_stone" pos="0 -5.0 0.6389" type="box" size="0.90 2.25 0.25" rgba="0.70 0.71 0.73 1" />
+    <geom name="neg_y_label" pos="0 -1.35 0.002" type="box" size="0.10 0.18 0.0001" quat="0.7071067811865476 0 0 -0.7071067811865475" contype="0" conaffinity="0" group="1" material="mat_label_4" rgba="1 1 1 1" />
+  </worldbody>
+</mujoco>

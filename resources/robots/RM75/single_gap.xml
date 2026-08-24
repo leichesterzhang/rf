@@ -1,0 +1,56 @@
+<mujoco model="jump_gap_cross_1_4_7_10">
+  <include file="RM75.xml"/>
+  <!-- Terrain: Cross Jump Gap. Levels 1,4,7,10. Gap widths: 0.25m, 0.40m, 0.65m, 0.80m. -->
+  <statistic center="0 0 0.1" extent="0.8" />
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0" />
+    <rgba haze="0.15 0.25 0.35 1" />
+    <global azimuth="-130" elevation="-20" />
+  </visual>
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072" />
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.18 0.22 0.28" rgb2="0.10 0.14 0.18" markrgb="0.8 0.8 0.8" width="300" height="300" />
+    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.0" />
+    <texture name="tex_label_1" type="2d" file="./imgs/label_1.png" />
+    <material name="mat_label_1" texture="tex_label_1" specular="0" shininess="0" emission="1" texrepeat="1 1" rgba="1 1 1 1" />
+    <texture name="tex_label_7" type="2d" file="./imgs/label_7.png" />
+    <material name="mat_label_7" texture="tex_label_7" specular="0" shininess="0" emission="1" texrepeat="1 1" rgba="1 1 1 1" />
+    <texture name="tex_label_10" type="2d" file="./imgs/label_10.png" />
+    <material name="mat_label_10" texture="tex_label_10" specular="0" shininess="0" emission="1" texrepeat="1 1" rgba="1 1 1 1" />
+    <texture name="tex_label_4" type="2d" file="./imgs/label_4.png" />
+    <material name="mat_label_4" texture="tex_label_4" specular="0" shininess="0" emission="1" texrepeat="1 1" rgba="1 1 1 1" />
+  </asset>
+  <worldbody>
+    <light pos="0 0 1.5" dir="0 0 -1" directional="true" />
+
+    <!-- Low catch floor so the gap is real while still bounded in Mujoco. -->
+    <geom name="pit_floor" pos="0 0 -1.25" size="20 20 0.10" type="box" material="groundplane" />
+
+    <!-- Central start hub: use a full-height pillar so the platform stands on the pit floor. -->
+    <geom name="hub" pos="0 0 -0.60" type="box" size="0.90 0.90 0.60" />
+
+    <!-- -X direction, level 1, 0.25m gap -->
+    <geom name="neg_x_takeoff" pos="-1.30 0 -0.60" type="box" size="0.40 0.45 0.60" />
+    <geom name="neg_x_landing" pos="-2.55 0 -0.60" type="box" size="0.60 0.60 0.60" />
+    <geom pos="-1.30 0 0.002" type="box" size="0.25 0.14 0.0001" contype="0" conaffinity="0" group="1" material="mat_label_1" rgba="1 1 1 1" />
+
+    <!-- +Y direction, level 7, 0.65m gap -->
+    <geom name="pos_y_takeoff" pos="0 1.30 -0.60" type="box" size="0.45 0.40 0.60" />
+    <geom name="pos_y_landing" pos="0 3.30 -0.60" type="box" size="0.60 0.60 0.60" />
+    <geom pos="0 1.30 0.002" type="box" size="0.14 0.25 0.0001" quat="0.7071067811865476 0 0 0.7071067811865475" contype="0" conaffinity="0" group="1" material="mat_label_7" rgba="1 1 1 1" />
+
+    <!-- +X direction, level 10, 0.80m gap -->
+    <geom name="pos_x_takeoff" pos="1.30 0 -0.60" type="box" size="0.40 0.45 0.60" />
+    <geom name="pos_x_landing" pos="3.30 0 -0.60" type="box" size="0.60 0.60 0.60" />
+    <geom pos="1.30 0 0.002" type="box" size="0.25 0.14 0.0001" contype="0" conaffinity="0" group="1" material="mat_label_10" rgba="1 1 1 1" />
+
+    <!-- -Y direction, level 4, 0.40m gap -->
+    <geom name="neg_y_takeoff" pos="0 -1.30 -0.60" type="box" size="0.45 0.40 0.60" />
+    <geom name="neg_y_landing" pos="0 -2.55 -0.60" type="box" size="0.60 0.45 0.60" />
+    <geom pos="0 -1.30 0.002" type="box" size="0.14 0.25 0.0001" quat="0.7071067811865476 0 0 -0.7071067811865475" contype="0" conaffinity="0" group="1" material="mat_label_4" rgba="1 1 1 1" />
+  </worldbody>
+
+  <keyframe>
+    <key name="single_gap_start" qpos="0 0 0.53 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"/>
+  </keyframe>
+</mujoco>

@@ -1,0 +1,160 @@
+{
+  "bundle": "/home/gh/GYM/5-28/logs/go2_parkour_moe/exported/policies/parkour_moe_inference_bundle.pt",
+  "opset": 16,
+  "files": {
+    "estimator": "estimator.onnx",
+    "actor": "actor.onnx",
+    "estimator_fp32_engine": "estimator.fp32.engine",
+    "estimator_fp16_engine": "estimator.fp16.engine",
+    "actor_fp32_engine": "actor.fp32.engine",
+    "actor_fp16_engine": "actor.fp16.engine"
+  },
+  "inputs": {
+    "estimator": {
+      "proprio_history": [
+        1,
+        450
+      ],
+      "depth": [
+        1,
+        1,
+        58,
+        87
+      ],
+      "vision_flag": [
+        1,
+        1
+      ],
+      "obs_now": [
+        1,
+        45
+      ],
+      "shared_state": [
+        1,
+        64
+      ]
+    },
+    "actor": {
+      "mcp_code": [
+        1,
+        69
+      ],
+      "obs": [
+        1,
+        45
+      ]
+    }
+  },
+  "outputs": {
+    "estimator": {
+      "mcp_code": [
+        1,
+        69
+      ],
+      "shared_state_next": [
+        1,
+        64
+      ],
+      "m_hat": [
+        1,
+        187
+      ],
+      "gating_weights": [
+        1,
+        3
+      ],
+      "terrain_probs": [
+        1,
+        12
+      ],
+      "fall_recovery_prob": [
+        1,
+        1
+      ]
+    },
+    "actor": {
+      "action": [
+        1,
+        12
+      ]
+    }
+  },
+  "policy_cfg": {
+    "activation": "elu",
+    "actor_hidden_dims": [
+      512,
+      256,
+      128
+    ],
+    "critic_hidden_dims": [
+      512,
+      256,
+      128
+    ],
+    "expert_num": 8,
+    "init_noise_std": 1.0,
+    "mcp_dim": 68,
+    "num_actor_obs_now": 45,
+    "num_critic_obs_fixed": null
+  },
+  "estimator_cfg": {
+    "active_token_count": 16,
+    "active_token_min_valid_mass": 0.05,
+    "active_token_noise_std": 0.02,
+    "cross_attn_nhead": 4,
+    "depth_frame_count": 1,
+    "expert_hidden_dim": 64,
+    "expert_num": 3,
+    "feet_height_dim": 4,
+    "hidden_dims": [
+      128,
+      64
+    ],
+    "history_length": 10,
+    "image_recon_latent_dim": 128,
+    "latent_dim": 16,
+    "local_patch_size": 15,
+    "local_patch_stride": 8,
+    "num_terrain_types": 12,
+    "proprio_dim": 45,
+    "shared_state_alpha": 0.5,
+    "shared_state_dim": 64,
+    "swav_epsilon": 0.05,
+    "swav_num_prototypes": 16,
+    "swav_sinkhorn_iters": 3,
+    "swav_temperature": 0.1,
+    "terrain_latent_dim": 32,
+    "terrain_map_dim": 187,
+    "terrain_window_length": 10,
+    "token_dropout_block_max_count": 3,
+    "token_dropout_block_max_size": [
+      2,
+      3
+    ],
+    "token_dropout_block_min_count": 1,
+    "token_dropout_block_min_size": [
+      1,
+      2
+    ],
+    "token_dropout_center_sigma": 0.3,
+    "token_dropout_center_weight": 0.2,
+    "token_dropout_far_row_end": 0.3,
+    "token_dropout_far_weight": 2.5,
+    "token_dropout_ground_row_start": 0.5,
+    "token_dropout_ground_weight": 3.5,
+    "token_dropout_max": 0.15,
+    "token_dropout_min": 0.0,
+    "token_dropout_mode": "spatial_block",
+    "token_dropout_uniform_weight": 0.1,
+    "transformer_ff_dim": 256,
+    "transformer_nhead": 4,
+    "transformer_num_layers": 1,
+    "use_active_token_sampler": true,
+    "vision_token_dim": 64
+  },
+  "num_obs": 45,
+  "num_critic_obs": 269,
+  "num_actions": 12,
+  "asset_dir": "/home/gh/GYM/5-28/logs/go2_parkour_moe/exported/policies/parkour_moe_trt_assets",
+  "note": "Current Go2 Parkour MoE deployment uses estimator.onnx + actor.onnx. No selector ONNX is exported."
+}

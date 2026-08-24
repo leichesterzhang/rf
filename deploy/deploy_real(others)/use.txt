@@ -1,0 +1,10 @@
+conda activate deploy
+export CYCLONEDDS_HOME=~/cyclonedds_ws/install/cyclonedds/
+export PYTHONPATH=$PYTHONPATH:/usr/lib/python3.8/dist-packages
+export ROS_DOMAIN_ID=10
+
+
+python3 deploy_real_go2_parkour_moe.py eth0 --no-blind-walk
+
+
+python3 visual_extreme_parkour.py --logdir traced
