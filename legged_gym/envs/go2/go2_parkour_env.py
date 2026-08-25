@@ -1779,12 +1779,8 @@ class Go2ParkourRobot(Go2Robot):
             print("Depth camera proxy backend requested 'warp' but this warp build has no torch interop. Falling back to torch.")
             return
 
-        # Plane environments do not construct the Terrain helper used by the
-        # trimesh path. In that case, keep proxy depth enabled and fall back to
-        # the torch raycaster, whose height sampler handles mesh_type="plane".
-        terrain = getattr(self, "terrain", None)
-        terrain_vertices = getattr(terrain, "vertices", None)
-        terrain_triangles = getattr(terrain, "triangles", None)
+        terrain_vertices = getattr(self.terrain, "vertices", None)
+        terrain_triangles = getattr(self.terrain, "triangles", None)
         if terrain_vertices is None or terrain_triangles is None:
             print("Depth camera proxy backend requested 'warp' but terrain mesh is unavailable. Falling back to torch.")
             return
@@ -1795,7 +1791,7 @@ class Go2ParkourRobot(Go2Robot):
 
             vertices = np.asarray(terrain_vertices, dtype=np.float32).copy()
             triangles = np.asarray(terrain_triangles, dtype=np.int32).reshape(-1)
-            border = float(terrain.cfg.border_size)
+            border = float(self.terrain.cfg.border_size)
             vertices[:, 0] -= border
             vertices[:, 1] -= border
 

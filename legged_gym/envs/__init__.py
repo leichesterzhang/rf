@@ -7,8 +7,6 @@ from legged_gym.envs.go2.go2_config_parkour_moe import GO2ParkourCfg, GO2CfgPark
 from legged_gym.envs.dog_502.dog_502_config_parkour_moe import DOG502ParkourCfg, DOG502CfgParkourMoE
 from legged_gym.envs.b2.b2_config_parkour_moe import B2ParkourCfg, B2CfgParkourMoE
 from legged_gym.envs.rm75.rm75_config_parkour_moe import RM75ParkourCfg, RM75CfgParkourMoE
-from legged_gym.envs.rm75.rm75_config_trot_slope import RM75CfgTrotSlopeMoE, RM75TrotSlopeCfg
-from legged_gym.envs.rm75.rm75_trot_slope_env import RM75TrotSlopeRobot
 from .base.legged_robot import LeggedRobot
 
 from legged_gym.utils.task_registry import task_registry
@@ -24,4 +22,3 @@ task_registry.register("go2_parkour_moe", Go2ParkourRobot, GO2ParkourCfg(), GO2C
 task_registry.register("dog_502_parkour_moe", Go2ParkourRobot, DOG502ParkourCfg(), DOG502CfgParkourMoE())
 task_registry.register("b2_parkour_moe", Go2ParkourRobot, B2ParkourCfg(), B2CfgParkourMoE())
 task_registry.register("RM75_parkour_moe", Go2ParkourRobot, RM75ParkourCfg(), RM75CfgParkourMoE())
-task_registry.register("rm75_trot_slope", RM75TrotSlopeRobot, RM75TrotSlopeCfg(), RM75CfgTrotSlopeMoE())

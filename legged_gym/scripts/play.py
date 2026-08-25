@@ -19,103 +19,6 @@ import torch
 import pygame
 
 
-FIXED_LOCOMOTION_MODE_SPECS = {
-    # mode_id, body-frame vx, body-frame vy, world-frame target heading
-    "stand": (0, 0.0, 0.0, 0.0),
-    "forward": (1, 1.0, 0.0, 0.0),
-    "side_left": (2, 0.0, 1.0, -0.5 * math.pi),
-    "side_right": (3, 0.0, -1.0, 0.5 * math.pi),
-}
-
-
-def configure_fixed_locomotion_mode(env_cfg, mode):
-    """Configure resets to use one locomotion mode for the whole playback."""
-    if mode not in FIXED_LOCOMOTION_MODE_SPECS:
-        allowed = ", ".join(FIXED_LOCOMOTION_MODE_SPECS)
-        raise ValueError(f"Unknown fixed locomotion mode '{mode}'. Allowed: {allowed}")
-
-    mode_id = FIXED_LOCOMOTION_MODE_SPECS[mode][0]
-    # Playback may intentionally select a non-training mode for an older
-    # checkpoint, so let the one-hot playback probabilities own the reset mode.
-    if hasattr(env_cfg.commands, "forward_only"):
-        env_cfg.commands.forward_only = False
-    if hasattr(env_cfg.commands, "locomotion_mode_probabilities"):
-        probabilities = [0.0] * len(FIXED_LOCOMOTION_MODE_SPECS)
-        probabilities[mode_id] = 1.0
-        env_cfg.commands.locomotion_mode_probabilities = probabilities
-
-    # Prevent the environment callback from replacing the fixed command between
-    # resets. apply_fixed_locomotion_command also refreshes the timer every step.
-    if hasattr(env_cfg.commands, "resampling_time"):
-        env_cfg.commands.resampling_time = max(
-            float(env_cfg.commands.resampling_time),
-            float(env_cfg.env.episode_length_s) + 1.0,
-        )
-
-
-def _sync_command_observation(obs, env):
-    """Write the fixed command into the already-built policy observation.
-
-    LeggedRobot.compute_observations stores [vx, vy, wz] at indices 9:12.
-    Merely changing env.commands after env.step is insufficient because obs was
-    already assembled, especially on the first action following an episode reset.
-    """
-    command_start = 3 + 3 + 3
-    command_end = command_start + 3
-    if obs is None or obs.ndim != 2 or obs.shape[1] < command_end:
-        raise ValueError("Policy observation is too small to contain the command slice")
-    obs[:, command_start:command_end] = env.commands[:, :3] * env.commands_scale
-    return obs
-
-
-def apply_fixed_locomotion_command(env, obs, mode, speed):
-    """Apply one mode-consistent command and synchronize the policy input."""
-    if mode not in FIXED_LOCOMOTION_MODE_SPECS:
-        allowed = ", ".join(FIXED_LOCOMOTION_MODE_SPECS)
-        raise ValueError(f"Unknown fixed locomotion mode '{mode}'. Allowed: {allowed}")
-    if speed < 0.0:
-        raise ValueError("Fixed locomotion speed must be non-negative")
-
-    mode_id, vx_sign, vy_sign, target_heading = FIXED_LOCOMOTION_MODE_SPECS[mode]
-    if mode_id >= 2 and not hasattr(env, "locomotion_mode"):
-        raise ValueError(f"Task '{type(env).__name__}' does not support fixed lateral modes")
-
-    if hasattr(env, "locomotion_mode"):
-        env.locomotion_mode.fill_(mode_id)
-    if hasattr(env, "trot_target_heading"):
-        env.trot_target_heading.fill_(target_heading)
-
-    env.commands[:, :3] = 0.0
-    env.commands[:, 0] = vx_sign * speed
-    env.commands[:, 1] = vy_sign * speed
-
-    if env.commands.shape[1] > 3:
-        env.commands[:, 3] = target_heading
-
-    heading_command = bool(getattr(env.cfg.commands, "heading_command", False))
-    if heading_command and env.commands.shape[1] > 3:
-        forward = quat_apply(env.base_quat, env.forward_vec)
-        heading = torch.atan2(forward[:, 1], forward[:, 0])
-        heading_error = target_heading - heading
-        heading_error = torch.atan2(torch.sin(heading_error), torch.cos(heading_error))
-        yaw_command = 0.5 * heading_error
-        if hasattr(env, "env_command_ranges"):
-            yaw_command = torch.clamp(
-                yaw_command,
-                min=env.env_command_ranges["ang_vel_yaw"][:, 0],
-                max=env.env_command_ranges["ang_vel_yaw"][:, 1],
-            )
-        env.commands[:, 2] = yaw_command
-
-    if hasattr(env, "stop_heading"):
-        env.stop_heading.fill_(False)
-    if hasattr(env, "commands_resampling_step"):
-        fixed_steps = max(1.0, float(env.cfg.commands.resampling_time) / float(env.dt))
-        env.commands_resampling_step.fill_(fixed_steps)
-
-    return _sync_command_observation(obs, env)
-
-
 def init_depth_viewer(depth_tensor, tile_scale=2, max_cols=10, extra_panel_width=0):
     num_envs, _, height, width = depth_tensor.shape
     cols = min(max_cols, max(1, math.ceil(math.sqrt(num_envs))))
@@ -565,11 +468,7 @@ def play(args):
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
     # override some parameters for testing
     env_cfg.env.num_envs = min(env_cfg.env.num_envs, 100)
-    play_terrain = getattr(args, "play_terrain", None)
-    if play_terrain not in (None, "configured", "plane"):
-        raise ValueError("--play_terrain must be 'plane' or 'configured'")
-    if play_terrain == "plane":
-        env_cfg.terrain.mesh_type = "plane"
+    # env_cfg.terrain.mesh_type = 'plane'
     env_cfg.terrain.num_rows = 7
     env_cfg.terrain.num_cols = 7
     env_cfg.terrain.curriculum = False
@@ -591,29 +490,9 @@ def play(args):
         env_cfg.camera.source = "proxy"
     env_cfg.env.enable_camera_sensors = False
 
-    fixed_command_mode = getattr(args, "fixed_command_mode", None) or FIXED_COMMAND_MODE
-    fixed_command_speed = getattr(args, "fixed_command_speed", None)
-    if fixed_command_speed is None:
-        fixed_command_speed = FIXED_COMMAND_SPEED
-
-    if FIX_COMMAND:
-        configure_fixed_locomotion_mode(env_cfg, fixed_command_mode)
-        print(
-            f"Fixed playback command: mode={fixed_command_mode}, "
-            f"speed={fixed_command_speed:.2f} m/s, "
-            f"terrain={env_cfg.terrain.mesh_type}"
-        )
-
     # prepare environment
     env, _ = task_registry.make_env(name=args.task, args=args, env_cfg=env_cfg)
     obs = env.get_observations()
-    if FIX_COMMAND:
-        obs = apply_fixed_locomotion_command(
-            env,
-            obs,
-            fixed_command_mode,
-            fixed_command_speed,
-        )
     # load policy
     train_cfg.runner.resume = True
     runner, train_cfg = task_registry.make_alg_runner(env=env, name=args.task, args=args, train_cfg=train_cfg)
@@ -695,12 +574,19 @@ def play(args):
                     return
 
         if FIX_COMMAND:
-            obs = apply_fixed_locomotion_command(
-                env,
-                obs,
-                fixed_command_mode,
-                fixed_command_speed,
-            )
+            if hasattr(env, "omni_world_lin_vel_x") and hasattr(env, "_omni_env_mask"):
+                omni_mask = env._omni_env_mask()
+                if torch.any(omni_mask):
+                    env.omni_world_lin_vel_x[omni_mask] = 1.0
+                    env._apply_omni_world_commands()
+                non_omni_mask = ~omni_mask
+                env.commands[non_omni_mask, 0] = 1.0
+                env.commands[non_omni_mask, 1] = 0.0
+                env.commands[non_omni_mask, 2] = 0.0
+            else:
+                env.commands[:, 0] = 1.0
+                env.commands[:, 1] = 0.0
+                env.commands[:, 2] = 0.0
 
         actions = policy(obs.detach())
         if SHOW_GATING_WEIGHTS:
@@ -794,8 +680,6 @@ if __name__ == '__main__':
     RECORD_FRAMES = False
     MOVE_CAMERA = False
     FIX_COMMAND = True
-    FIXED_COMMAND_MODE = "forward"
-    FIXED_COMMAND_SPEED = 1.0
     SHOW_HEIGHT_SCAN = True
     SHOW_RECON_SCAN = True
     SHOW_CAMERA_POSE = False
@@ -803,7 +687,7 @@ if __name__ == '__main__':
     SHOW_TARGETED_FOOTHOLDS = True
     SHOW_GATING_WEIGHTS = True
     SHOW_VELOCITY_TEXT = False
-    PLAY_RANDOM_TOKEN_DROPOUT = False
+    PLAY_RANDOM_TOKEN_DROPOUT = True
     SHOW_TOKEN_DROPOUT_OVERLAY = True
     SHOW_ACTIVE_TOKEN_OVERLAY = True
     PLAY_TOKEN_DROPOUT_MIN = None

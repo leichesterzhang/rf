@@ -756,11 +756,7 @@ class OnPolicyRunnerParkourMoE:
                 "optimizer_state_dict": self.alg.optimizer.state_dict(),
                 "estimator_state_dict": self.alg.estimator.state_dict(),
                 "estimator_optimizer_state_dict": self.alg.estimator_optimizer.state_dict(),
-                # Periodic saves happen before current_learning_iteration is
-                # updated at the end of learn(), so persist the explicit loop
-                # iteration passed by the caller.  Otherwise every checkpoint
-                # in a long run incorrectly records iteration zero.
-                "iter": it,
+                "iter": self.current_learning_iteration,
                 "estimator_update_counter": self.alg.estimator_update_counter,
                 "infos": infos,
             },
