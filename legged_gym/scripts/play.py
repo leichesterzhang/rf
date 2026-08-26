@@ -442,6 +442,20 @@ def update_viewer_to_camera_pose(env, env_id, look_ahead=1.2):
     )
 
 
+def update_viewer_follow_robot(env, env_id=0):
+    env_id = min(env_id, env.num_envs - 1)
+    robot_pos = env.root_states[env_id, :3]
+    camera_pos = robot_pos + torch.tensor([-4.0, -3.0, 2.0], device=env.device)
+    look_at = robot_pos + torch.tensor([0.8, 0.0, 0.3], device=env.device)
+
+    env.gym.viewer_camera_look_at(
+        env.viewer,
+        None,
+        gymapi.Vec3(*camera_pos.detach().cpu().tolist()),
+        gymapi.Vec3(*look_at.detach().cpu().tolist()),
+    )
+
+
 def get_reconstructed_height_world(env, runner, env_id):
     if not hasattr(runner, "latest_inference_m_hat") or runner.latest_inference_m_hat is None:
         return None
@@ -496,13 +510,16 @@ def play(args):
     # load policy
     train_cfg.runner.resume = True
     runner, train_cfg = task_registry.make_alg_runner(env=env, name=args.task, args=args, train_cfg=train_cfg)
-    policy = runner.get_inference_policy(
-        device=env.device,
-        random_token_dropout=PLAY_RANDOM_TOKEN_DROPOUT,
-        token_dropout_min=PLAY_TOKEN_DROPOUT_MIN,
-        token_dropout_max=PLAY_TOKEN_DROPOUT_MAX,
-    )
-    
+    if train_cfg.runner_class_name == "OnPolicyRunnerParkourMoE":
+        policy = runner.get_inference_policy(
+            device=env.device,
+            random_token_dropout=PLAY_RANDOM_TOKEN_DROPOUT,
+            token_dropout_min=PLAY_TOKEN_DROPOUT_MIN,
+            token_dropout_max=PLAY_TOKEN_DROPOUT_MAX,
+        )
+    else:
+        policy = runner.get_inference_policy(device=env.device)
+
     # export policy as a jit module (used to run it from C++)
     if EXPORT_POLICY:
         path = os.path.join(LEGGED_GYM_ROOT_DIR, 'logs', train_cfg.runner.experiment_name, 'exported', 'policies')
@@ -548,7 +565,13 @@ def play(args):
             depth_viewer[8],
             depth_viewer[9],
         )
-    if SHOW_HEIGHT_SCAN and env.viewer is not None:
+    if (
+        SHOW_HEIGHT_SCAN
+        and env.viewer is not None
+        and hasattr(env, "height_points")
+        and torch.is_tensor(env.measured_heights)
+        and env.measured_heights.ndim == 2
+    ):
         height_scan_geom = gymutil.WireframeSphereGeometry(0.015, 6, 6, None, color=(0.1, 0.9, 0.1))
     if SHOW_RECON_SCAN and env.viewer is not None:
         recon_scan_geom = gymutil.WireframeSphereGeometry(0.012, 6, 6, None, color=(0.95, 0.45, 0.1))
@@ -566,6 +589,12 @@ def play(args):
             gymutil.WireframeSphereGeometry(0.022, 6, 6, None, color=(0.95, 0.82, 0.2)),
         ]
 
+    fixed_command = torch.tensor(
+        getattr(env.cfg.commands, "play_command", [1.0, 0.0, 0.0]),
+        dtype=torch.float,
+        device=env.device,
+    )
+
     for i in range(10*int(env.max_episode_length)):
         if depth_viewer is not None:
             for event in pygame.event.get():
@@ -577,23 +606,19 @@ def play(args):
             if hasattr(env, "omni_world_lin_vel_x") and hasattr(env, "_omni_env_mask"):
                 omni_mask = env._omni_env_mask()
                 if torch.any(omni_mask):
-                    env.omni_world_lin_vel_x[omni_mask] = 1.0
+                    env.omni_world_lin_vel_x[omni_mask] = fixed_command[0]
                     env._apply_omni_world_commands()
                 non_omni_mask = ~omni_mask
-                env.commands[non_omni_mask, 0] = 1.0
-                env.commands[non_omni_mask, 1] = 0.0
-                env.commands[non_omni_mask, 2] = 0.0
+                env.commands[non_omni_mask, :3] = fixed_command
             else:
-                env.commands[:, 0] = 1.0
-                env.commands[:, 1] = 0.0
-                env.commands[:, 2] = 0.0
+                env.commands[:, :3] = fixed_command
 
         actions = policy(obs.detach())
         if SHOW_GATING_WEIGHTS:
             append_gating_history(gating_history, runner, DEBUG_ENV_ID)
 
-        if MOVE_CAMERA and env.viewer is not None:
-            update_viewer_to_camera_pose(env, DEBUG_ENV_ID)
+        if args.follow_camera and env.viewer is not None:
+            update_viewer_follow_robot(env, DEBUG_ENV_ID)
 
         if (
             height_scan_geom is not None
@@ -678,7 +703,6 @@ def play(args):
 if __name__ == '__main__':
     EXPORT_POLICY = True
     RECORD_FRAMES = False
-    MOVE_CAMERA = False
     FIX_COMMAND = True
     SHOW_HEIGHT_SCAN = True
     SHOW_RECON_SCAN = True
@@ -698,5 +722,14 @@ if __name__ == '__main__':
     GATING_HISTORY_LENGTH = 240
     GATING_PANEL_WIDTH = 360
     DEBUG_ENV_ID = 0
-    args = get_args()
+    args = get_args(
+        additional_parameters=[
+            {
+                "name": "--follow_camera",
+                "action": "store_true",
+                "default": False,
+                "help": "Keep the replay viewer camera following the debug robot.",
+            },
+        ]
+    )
     play(args)
