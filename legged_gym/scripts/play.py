@@ -483,9 +483,18 @@ def play(args):
     # override some parameters for testing
     env_cfg.env.num_envs = min(env_cfg.env.num_envs, 100)
     # env_cfg.terrain.mesh_type = 'plane'
-    env_cfg.terrain.num_rows = 7
+    env_cfg.terrain.num_rows = 20 if args.continuous_replay else 7
     env_cfg.terrain.num_cols = 7
     env_cfg.terrain.curriculum = False
+    if args.continuous_replay:
+        env_cfg.terrain.reset_when_outside_block = False
+        if args.play_duration is None or args.play_duration < 0.0:
+            env_cfg.env.episode_length_s = 1.0e9
+        else:
+            env_cfg.env.episode_length_s = max(
+                float(env_cfg.env.episode_length_s),
+                float(args.play_duration) + 1.0,
+            )
     env_cfg.noise.add_noise = False
     env_cfg.domain_rand.randomize_friction = False
     env_cfg.domain_rand.push_robots = False
@@ -595,7 +604,15 @@ def play(args):
         device=env.device,
     )
 
-    for i in range(10*int(env.max_episode_length)):
+    if args.play_duration is None:
+        play_steps = 10 * int(env.max_episode_length)
+    elif args.play_duration < 0.0:
+        play_steps = None
+    else:
+        play_steps = max(0, int(math.ceil(args.play_duration / env.dt)))
+
+    i = 0
+    while play_steps is None or i < play_steps:
         if depth_viewer is not None:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -696,6 +713,7 @@ def play(args):
         elif SHOW_VELOCITY_TEXT and i % 20 == 0:
             print(" | ".join(get_velocity_overlay_lines(env, DEBUG_ENV_ID)))
         obs, _, rews, dones, infos = env.step(actions.detach())
+        i += 1
 
     if depth_viewer is not None:
         pygame.quit()
@@ -729,6 +747,24 @@ if __name__ == '__main__':
                 "action": "store_true",
                 "default": False,
                 "help": "Keep the replay viewer camera following the debug robot.",
+            },
+            {
+                "name": "--play_duration",
+                "type": float,
+                "default": None,
+                "help": (
+                    "Replay duration in simulated seconds. Omit to keep the existing "
+                    "10-episode default; use -1 to replay until the window is closed."
+                ),
+            },
+            {
+                "name": "--continuous_replay",
+                "action": "store_true",
+                "default": False,
+                "help": (
+                    "Disable terrain-boundary and episode-timeout resets during replay. "
+                    "True falls and other failure terminations still reset the robot."
+                ),
             },
         ]
     )

@@ -48,7 +48,11 @@ class PPOParkourMoE:
         self.estimator = ParkourEstimator(**self.estimator_cfg).to(device)
 
         self.storage = None
-        self.optimizer = optim.Adam(self.actor_critic.parameters(), lr=learning_rate)
+        if hasattr(self.actor_critic, "optimizer_parameter_groups"):
+            actor_critic_parameters = self.actor_critic.optimizer_parameter_groups(learning_rate)
+        else:
+            actor_critic_parameters = self.actor_critic.parameters()
+        self.optimizer = optim.Adam(actor_critic_parameters, lr=learning_rate)
         self.estimator_optimizer = optim.Adam(self.estimator.parameters(), lr=estimator_learning_rate)
         self.transition = RolloutStorageParkourMoE.Transition()
 

@@ -13,7 +13,7 @@ from torch.utils.tensorboard import SummaryWriter
 from legged_gym.utils.helpers import class_to_dict
 from rsl_rl.algorithms import PPOParkourMoE
 from rsl_rl.env import VecEnv
-from rsl_rl.modules import ActorCriticParkourMoE, DefaultEstimator
+from rsl_rl.modules import ActorCriticParkourMoE, ActorCriticVisualResidual, DefaultEstimator
 
 
 def numpy_representer(dumper, data):
@@ -406,6 +406,8 @@ class OnPolicyRunnerParkourMoE:
 
         tot_iter = self.current_learning_iteration + num_learning_iterations
         for it in range(self.current_learning_iteration, tot_iter):
+            if hasattr(self.alg.actor_critic, "set_training_iteration"):
+                self.alg.actor_critic.set_training_iteration(it)
             if self.easy_idx_tensor.numel() > 0 and it % self.vision_toggle_interval == 0:
                 self.mask[self.easy_idx_tensor] = ~self.mask[self.easy_idx_tensor]
             self._apply_omni_vision_mask(self.mask)
@@ -800,6 +802,17 @@ class OnPolicyRunnerParkourMoE:
         self.current_learning_iteration = loaded_dict["iter"]
         self.alg.estimator_update_counter = loaded_dict.get("estimator_update_counter", 0)
         return loaded_dict["infos"]
+
+    def warm_start(self, path, max_action_std=0.45, critic_common_dim=76):
+        if not hasattr(self.alg.actor_critic, "warm_start_from_flat_checkpoint"):
+            raise RuntimeError(
+                f"{type(self.alg.actor_critic).__name__} does not support flat-policy warm starts."
+            )
+        return self.alg.actor_critic.warm_start_from_flat_checkpoint(
+            path,
+            max_action_std=max_action_std,
+            critic_common_dim=critic_common_dim,
+        )
 
     def get_inference_policy(
         self,

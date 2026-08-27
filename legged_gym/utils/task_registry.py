@@ -123,6 +123,26 @@ class TaskRegistry():
             resume_path = get_load_path(log_root, load_run=train_cfg.runner.load_run, checkpoint=train_cfg.runner.checkpoint)
             print(f"Loading model from: {resume_path}")
             runner.load(resume_path)
+        else:
+            warm_start_path = getattr(train_cfg.runner, "warm_start_path", None)
+            if warm_start_path:
+                warm_start_path = warm_start_path.format(
+                    LEGGED_GYM_ROOT_DIR=LEGGED_GYM_ROOT_DIR
+                )
+                if not os.path.isfile(warm_start_path):
+                    raise FileNotFoundError(
+                        f"Warm-start checkpoint does not exist: {warm_start_path}"
+                    )
+                if not hasattr(runner, "warm_start"):
+                    raise RuntimeError(
+                        f"Runner {type(runner).__name__} does not implement warm_start()."
+                    )
+                print(f"Warm-starting policy from: {warm_start_path}")
+                runner.warm_start(
+                    warm_start_path,
+                    max_action_std=getattr(train_cfg.runner, "warm_start_max_action_std", 0.45),
+                    critic_common_dim=getattr(train_cfg.runner, "warm_start_critic_common_dim", 76),
+                )
         return runner, train_cfg
 
 # make global task registry

@@ -29,6 +29,7 @@
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
 
 from .actor_critic import ActorCritic
+from .actor_critic_visual_residual import ActorCriticVisualResidual
 from .actor_critic_recurrent import ActorCriticRecurrent
 from .actor_critic_cts import ActorCriticCTS
 from .actor_critic_moe_ng_cts import ActorCriticMoENGCTS

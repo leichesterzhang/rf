@@ -175,6 +175,7 @@ def build_mgdp_parkour_terrain(terrain, choice, difficulty, cfg, proportions):
             difficulty=difficulty,
             cfg=cfg,
             depth=depth,
+            platform_size=float(getattr(cfg, "ramp_segment_length", 2.0)),
             max_angle_deg=float(getattr(cfg, "ramp_max_angle_deg", 30.0)),
         )
     elif choice < proportions[9]:
