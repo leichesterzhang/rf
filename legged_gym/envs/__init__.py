@@ -9,6 +9,13 @@ from legged_gym.envs.b2.b2_config_parkour_moe import B2ParkourCfg, B2CfgParkourM
 from legged_gym.envs.rm75.rm75_config_parkour_moe import RM75ParkourCfg, RM75CfgParkourMoE
 from legged_gym.envs.rm75.rm75_config_flat_trot import RM75FlatTrotCfg, RM75FlatTrotCfgPPO
 from legged_gym.envs.rm75.rm75_flat_trot_env import RM75FlatTrotRobot
+from legged_gym.envs.rm75.rm75_config_torque_limited_flat_trot import (
+    RM75TorqueLimitedFlatTrotCfg,
+    RM75TorqueLimitedFlatTrotCfgPPO,
+)
+from legged_gym.envs.rm75.rm75_torque_limited_flat_trot_env import (
+    RM75TorqueLimitedFlatTrotRobot,
+)
 from legged_gym.envs.rm75.rm75_config_visual_ramp_trot import RM75VisualRampTrotCfg, RM75VisualRampTrotCfgPPO
 from legged_gym.envs.rm75.rm75_visual_ramp_trot_env import RM75VisualRampTrotRobot
 from legged_gym.envs.rm75.rm75_config_visual_ramp_trot_35deg import (
@@ -31,6 +38,12 @@ task_registry.register("dog_502_parkour_moe", Go2ParkourRobot, DOG502ParkourCfg(
 task_registry.register("b2_parkour_moe", Go2ParkourRobot, B2ParkourCfg(), B2CfgParkourMoE())
 task_registry.register("RM75_parkour_moe", Go2ParkourRobot, RM75ParkourCfg(), RM75CfgParkourMoE())
 task_registry.register("RM75_flat_trot_3ms", RM75FlatTrotRobot, RM75FlatTrotCfg(), RM75FlatTrotCfgPPO())
+task_registry.register(
+    "RM75_flat_trot_3ms_hip100_knee160",
+    RM75TorqueLimitedFlatTrotRobot,
+    RM75TorqueLimitedFlatTrotCfg(),
+    RM75TorqueLimitedFlatTrotCfgPPO(),
+)
 task_registry.register(
     "RM75_visual_ramp_trot_3ms_25deg",
     RM75VisualRampTrotRobot,

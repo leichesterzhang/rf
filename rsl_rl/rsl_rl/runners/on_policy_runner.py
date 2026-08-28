@@ -169,7 +169,14 @@ class OnPolicyRunner:
             ep_infos.clear()
         
         self.current_learning_iteration += num_learning_iterations
-        self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(self.current_learning_iteration)), it, True)
+        self.save(
+            os.path.join(
+                self.log_dir,
+                'model_{}.pt'.format(self.current_learning_iteration),
+            ),
+            self.current_learning_iteration,
+            True,
+        )
 
     def log(self, locs, width=80, pad=35):
         self.tot_timesteps += self.num_steps_per_env * self.env.num_envs
@@ -244,7 +251,7 @@ class OnPolicyRunner:
         torch.save({
             'model_state_dict': self.alg.actor_critic.state_dict(),
             'optimizer_state_dict': self.alg.optimizer.state_dict(),
-            'iter': self.current_learning_iteration,
+            'iter': int(it),
             'infos': infos,
             }, path)
         self.update_robogauge(it, last_model)
@@ -299,8 +306,49 @@ class OnPolicyRunner:
         self.alg.actor_critic.load_state_dict(loaded_dict['model_state_dict'])
         if load_optimizer:
             self.alg.optimizer.load_state_dict(loaded_dict['optimizer_state_dict'])
-        self.current_learning_iteration = loaded_dict['iter']
+        stored_iteration = int(loaded_dict.get('iter', 0))
+        checkpoint_iteration = None
+        stem_parts = Path(path).stem.rsplit('_', 1)
+        if len(stem_parts) == 2 and stem_parts[1].isdigit():
+            checkpoint_iteration = int(stem_parts[1])
+        if (
+            stored_iteration == 0
+            and checkpoint_iteration is not None
+            and checkpoint_iteration > 0
+        ):
+            print(
+                "Checkpoint metadata contains iter=0; resuming from filename "
+                f"iteration {checkpoint_iteration}"
+            )
+            stored_iteration = checkpoint_iteration
+        self.current_learning_iteration = stored_iteration
         return loaded_dict['infos']
+
+    def warm_start(self, path, max_action_std=0.45, critic_common_dim=None):
+        """Load network weights while keeping a fresh PPO optimizer and counter."""
+        del critic_common_dim
+        loaded_dict = torch.load(path, map_location=self.device)
+        self.alg.actor_critic.load_state_dict(
+            loaded_dict['model_state_dict'], strict=True
+        )
+
+        if max_action_std is not None:
+            max_action_std = float(max_action_std)
+            if max_action_std <= 0.0:
+                raise ValueError("max_action_std must be positive or None")
+            if not hasattr(self.alg.actor_critic, "std"):
+                raise RuntimeError(
+                    "Warm-start action-noise limiting requires actor_critic.std"
+                )
+            with torch.no_grad():
+                self.alg.actor_critic.std.clamp_(max=max_action_std)
+
+        self.current_learning_iteration = 0
+        print(
+            "Warm-started ActorCritic weights with a fresh optimizer "
+            f"(max_action_std={max_action_std}, iteration=0)"
+        )
+        return loaded_dict.get('infos')
 
     def get_inference_policy(self, device=None):
         self.alg.actor_critic.eval() # switch to evaluation mode (dropout for example)
