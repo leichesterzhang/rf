@@ -1,0 +1,41 @@
+<mujoco model="RM75 repeated 35 degree visual ramp heightfield">
+  <include file="RM75.xml"/>
+
+  <statistic center="6 0 0.7" extent="7"/>
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="-135" elevation="-20"/>
+  </visual>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0"
+             width="512" height="3072"/>
+    <texture type="2d" name="ramp_ground" builtin="checker" mark="edge"
+             rgb1="0.24 0.32 0.38" rgb2="0.12 0.18 0.22" markrgb="0.8 0.8 0.8"
+             width="300" height="300"/>
+    <material name="ramp_ground" texture="ramp_ground" texuniform="true"
+              texrepeat="4 4" reflectance="0.0"/>
+    <!-- 181 lateral samples x 4801 longitudinal samples at 5 cm spacing.
+         Heights are quantized to the training vertical scale of 5 mm. -->
+    <hfield name="repeated_ramp_hfield"
+            file="visual_ramp_35deg_repeated.bin"
+            content_type="image/vnd.mujoco.hfield"
+            size="120 4.5 1.4 2.0"/>
+  </asset>
+
+  <worldbody>
+    <light pos="4 0 6" dir="0 0 -1" directional="true"/>
+    <geom name="lower_surround" type="plane" pos="0 0 -2" size="0 0 0.05"
+          material="ramp_ground" friction="0.9 0.02 0.01"/>
+    <!-- Track spans x=-1..239 m so the robot starts at the middle of the same
+         2 m reset platform as in training. One hfield removes box seams. -->
+    <geom name="repeated_ramp" type="hfield" hfield="repeated_ramp_hfield"
+          pos="119 0 0" material="ramp_ground" friction="0.9 0.02 0.01"/>
+  </worldbody>
+
+  <keyframe>
+    <key name="repeated_ramp_start"
+         qpos="0 0 0.53 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"/>
+  </keyframe>
+</mujoco>

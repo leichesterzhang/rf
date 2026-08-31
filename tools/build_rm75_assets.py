@@ -630,6 +630,19 @@ def build_mujoco_model():
                 ET.SubElement(child_body, "joint", **joint_attributes)
             append_link(child_body, child_name)
 
+        if link_name.endswith("_foot"):
+            ET.SubElement(
+                body,
+                "geom",
+                name=f"{link_name}_contact_visual",
+                type="sphere",
+                size="0.032",
+                material="rm75_white",
+                contype="0",
+                conaffinity="0",
+                group="2",
+            )
+
     append_link(base, "base_link")
 
     actuator = ET.SubElement(model, "actuator")

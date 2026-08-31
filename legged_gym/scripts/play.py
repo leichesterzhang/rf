@@ -8,9 +8,10 @@ from legged_gym import LEGGED_GYM_ROOT_DIR
 
 import isaacgym
 from isaacgym import gymapi, gymutil
-from isaacgym.torch_utils import quat_apply, quat_mul
+from isaacgym.torch_utils import quat_apply, quat_mul, quat_rotate_inverse
 from legged_gym.envs import *
 from legged_gym.utils import  get_args, task_registry, Logger
+from legged_gym.utils.isaacgym_utils import get_euler_xyz as get_euler_xyz_in_tensor
 from legged_gym.utils.math import quat_apply_yaw
 from legged_gym.utils.exporter import export_policy_as_jit, export_policy_as_onnx, export_policy_as_pkl
 
@@ -478,6 +479,95 @@ def append_gating_history(history_buffer, runner, env_id):
         runner.latest_inference_gating_weights[env_id].detach().cpu().float().numpy().copy()
     )
 
+
+def resolve_play_command(env, args):
+    """Resolve an optional fixed replay command without assuming a task speed."""
+    overrides = (args.command_vx, args.command_vy, args.command_yaw)
+    if args.use_sampled_commands:
+        if any(value is not None for value in overrides):
+            raise ValueError(
+                "--use_sampled_commands cannot be combined with command overrides."
+            )
+        return None
+
+    configured_command = getattr(env.cfg.commands, "play_command", None)
+    if configured_command is None and all(value is None for value in overrides):
+        return None
+
+    command = list(configured_command) if configured_command is not None else [0.0, 0.0, 0.0]
+    if len(command) < 3:
+        raise ValueError(
+            "env.cfg.commands.play_command must contain [vx, vy, yaw_rate]."
+        )
+    command = command[:3]
+    for index, value in enumerate(overrides):
+        if value is not None:
+            command[index] = value
+    return torch.tensor(command, dtype=torch.float, device=env.device)
+
+
+def apply_play_command(env, fixed_command):
+    """Apply a task-configured or CLI-overridden fixed command, if requested."""
+    if fixed_command is None:
+        return
+    if hasattr(env, "omni_world_lin_vel_x") and hasattr(env, "_omni_env_mask"):
+        omni_mask = env._omni_env_mask()
+        if torch.any(omni_mask):
+            env.omni_world_lin_vel_x[omni_mask] = fixed_command[0]
+            env._apply_omni_world_commands()
+        non_omni_mask = ~omni_mask
+        env.commands[non_omni_mask, :3] = fixed_command
+    else:
+        env.commands[:, :3] = fixed_command
+
+
+def prepare_playback_start(env, fixed_command):
+    """Create a clean, observation-consistent state after runner construction.
+
+    Runner construction calls ``env.reset()``, which advances the physics once with
+    zero actions. Reset once more without stepping so the first policy action sees
+    exactly the state that is displayed by the simulator.
+    """
+    env_ids = torch.arange(env.num_envs, device=env.device, dtype=torch.long)
+    env.reset_idx(env_ids)
+
+    # Indexed state setters used by reset_idx update the simulator. Refresh their
+    # tensor views before deriving the quantities consumed by observations.
+    env.gym.refresh_dof_state_tensor(env.sim)
+    env.gym.refresh_actor_root_state_tensor(env.sim)
+    env.gym.refresh_net_contact_force_tensor(env.sim)
+    env.gym.refresh_rigid_body_state_tensor(env.sim)
+
+    if hasattr(env, "base_quat"):
+        env.base_quat[:] = env.root_states[:, 3:7]
+    if hasattr(env, "base_pos"):
+        env.base_pos[:] = env.root_states[:, :3]
+    if hasattr(env, "rpy"):
+        env.rpy[:] = get_euler_xyz_in_tensor(env.root_states[:, 3:7])
+    if hasattr(env, "base_lin_vel"):
+        env.base_lin_vel[:] = quat_rotate_inverse(
+            env.root_states[:, 3:7], env.root_states[:, 7:10]
+        )
+    if hasattr(env, "base_ang_vel"):
+        env.base_ang_vel[:] = quat_rotate_inverse(
+            env.root_states[:, 3:7], env.root_states[:, 10:13]
+        )
+    if hasattr(env, "projected_gravity"):
+        env.projected_gravity[:] = quat_rotate_inverse(
+            env.root_states[:, 3:7], env.gravity_vec
+        )
+    if hasattr(env, "last_dof_vel"):
+        env.last_dof_vel[env_ids] = env.dof_vel[env_ids]
+    if hasattr(env, "last_root_vel"):
+        env.last_root_vel[env_ids] = env.root_states[env_ids, 7:13]
+
+    # Refresh terrain/depth observations that reset_idx deliberately invalidates.
+    if hasattr(env, "_post_physics_step_callback"):
+        env._post_physics_step_callback()
+    apply_play_command(env, fixed_command)
+    env.compute_observations()
+    return env.get_observations()
+
 def play(args):
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
     # override some parameters for testing
@@ -515,7 +605,6 @@ def play(args):
 
     # prepare environment
     env, _ = task_registry.make_env(name=args.task, args=args, env_cfg=env_cfg)
-    obs = env.get_observations()
     # load policy
     train_cfg.runner.resume = True
     runner, train_cfg = task_registry.make_alg_runner(env=env, name=args.task, args=args, train_cfg=train_cfg)
@@ -528,6 +617,19 @@ def play(args):
         )
     else:
         policy = runner.get_inference_policy(device=env.device)
+
+    fixed_command = resolve_play_command(env, args)
+    obs = prepare_playback_start(env, fixed_command)
+    if fixed_command is None:
+        print("Replay command source: environment sampling")
+    else:
+        command_values = fixed_command.detach().cpu().tolist()
+        print(
+            "Replay fixed command: "
+            f"vx={command_values[0]:.3f} m/s, "
+            f"vy={command_values[1]:.3f} m/s, "
+            f"yaw_rate={command_values[2]:.3f} rad/s"
+        )
 
     # export policy as a jit module (used to run it from C++)
     if EXPORT_POLICY:
@@ -598,12 +700,6 @@ def play(args):
             gymutil.WireframeSphereGeometry(0.022, 6, 6, None, color=(0.95, 0.82, 0.2)),
         ]
 
-    fixed_command = torch.tensor(
-        getattr(env.cfg.commands, "play_command", [1.0, 0.0, 0.0]),
-        dtype=torch.float,
-        device=env.device,
-    )
-
     if args.play_duration is None:
         play_steps = 10 * int(env.max_episode_length)
     elif args.play_duration < 0.0:
@@ -619,16 +715,15 @@ def play(args):
                     pygame.quit()
                     return
 
-        if FIX_COMMAND:
-            if hasattr(env, "omni_world_lin_vel_x") and hasattr(env, "_omni_env_mask"):
-                omni_mask = env._omni_env_mask()
-                if torch.any(omni_mask):
-                    env.omni_world_lin_vel_x[omni_mask] = fixed_command[0]
-                    env._apply_omni_world_commands()
-                non_omni_mask = ~omni_mask
-                env.commands[non_omni_mask, :3] = fixed_command
-            else:
-                env.commands[:, :3] = fixed_command
+        if fixed_command is not None:
+            # env.step() may have reset an environment and built its returned
+            # observation with a newly sampled command. Keep the command stored
+            # in the environment and the command seen by the policy identical.
+            commands_before = env.commands[:, :3].clone()
+            apply_play_command(env, fixed_command)
+            if not torch.equal(commands_before, env.commands[:, :3]):
+                env.compute_observations()
+                obs = env.get_observations()
 
         actions = policy(obs.detach())
         if SHOW_GATING_WEIGHTS:
@@ -721,7 +816,6 @@ def play(args):
 if __name__ == '__main__':
     EXPORT_POLICY = True
     RECORD_FRAMES = False
-    FIX_COMMAND = True
     SHOW_HEIGHT_SCAN = True
     SHOW_RECON_SCAN = True
     SHOW_CAMERA_POSE = False
@@ -765,6 +859,33 @@ if __name__ == '__main__':
                     "Disable terrain-boundary and episode-timeout resets during replay. "
                     "True falls and other failure terminations still reset the robot."
                 ),
+            },
+            {
+                "name": "--use_sampled_commands",
+                "action": "store_true",
+                "default": False,
+                "help": (
+                    "Use commands sampled by the environment instead of a fixed "
+                    "replay command."
+                ),
+            },
+            {
+                "name": "--command_vx",
+                "type": float,
+                "default": None,
+                "help": "Override the fixed replay forward velocity in m/s.",
+            },
+            {
+                "name": "--command_vy",
+                "type": float,
+                "default": None,
+                "help": "Override the fixed replay lateral velocity in m/s.",
+            },
+            {
+                "name": "--command_yaw",
+                "type": float,
+                "default": None,
+                "help": "Override the fixed replay yaw rate in rad/s.",
             },
         ]
     )

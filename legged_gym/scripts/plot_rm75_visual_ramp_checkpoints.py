@@ -26,9 +26,63 @@ TASKS = {
         "run": "Aug26_15-26-47_warmstart_model25000",
     },
     35: {
-        "task": "RM75_visual_ramp_trot_3ms_35deg",
-        "experiment": "RM75_visual_ramp_trot_3ms_35deg",
-        "run": "Aug26_15-36-04_warmstart_model25000",
+        "task": "RM75_visual_ramp_trot_3ms_35deg_hip100_knee160",
+        "experiment": "RM75_visual_ramp_trot_3ms_35deg_hip100_knee160",
+        "run": "Aug28_10-22-28_warmstart_torque_model30000",
+    },
+}
+POLICY_PROFILES = {
+    "torque_limited_trot": {
+        "task": "RM75_flat_trot_3ms_hip100_knee160",
+        "experiment": "RM75_flat_trot_3ms_hip100_knee160",
+        "run": "Aug27_14-56-04_warmstart_earth_model25000",
+        "checkpoints": {
+            checkpoint: (
+                "RM75_flat_trot_3ms_hip100_knee160",
+                "Aug27_14-56-04_warmstart_earth_model25000",
+                checkpoint,
+            )
+            for checkpoint in DEFAULT_CHECKPOINTS
+        },
+    },
+    "lunar_1_6g_trot": {
+        "task": "RM75_lunar_flat_trot_3ms_recovery",
+        "experiment": "RM75_lunar_flat_trot_3ms_recovery",
+        "run": "Aug27_17-21-13_warmstart_lunar_model12000",
+        # The labels are total-equivalent progress. Recovery checkpoints use a
+        # fresh local counter after warm-starting from the original model_12000.
+        "checkpoints": {
+            5000: (
+                "RM75_lunar_flat_trot_3ms",
+                "Aug27_14-06-43_warmstart_earth_model25000",
+                5000,
+            ),
+            10000: (
+                "RM75_lunar_flat_trot_3ms",
+                "Aug27_14-06-43_warmstart_earth_model25000",
+                10000,
+            ),
+            15000: (
+                "RM75_lunar_flat_trot_3ms_recovery",
+                "Aug27_17-21-13_warmstart_lunar_model12000",
+                3000,
+            ),
+            20000: (
+                "RM75_lunar_flat_trot_3ms_recovery",
+                "Aug27_17-21-13_warmstart_lunar_model12000",
+                8000,
+            ),
+            25000: (
+                "RM75_lunar_flat_trot_3ms_recovery",
+                "Aug27_17-21-13_warmstart_lunar_model12000",
+                13000,
+            ),
+            30000: (
+                "RM75_lunar_flat_trot_3ms_recovery",
+                "Aug27_17-21-13_warmstart_lunar_model12000",
+                18000,
+            ),
+        },
     },
 }
 LEG_ORDER = ("FL", "FR", "RL", "RR")
@@ -60,6 +114,21 @@ def parse_args():
                 "help": "Maximum ramp angle to evaluate: 25 or 35 degrees.",
             },
             {
+                "name": "--policy_profile",
+                "type": str,
+                "default": None,
+                "help": (
+                    "Optional non-visual policy profile: "
+                    "torque_limited_trot or lunar_1_6g_trot."
+                ),
+            },
+            {
+                "name": "--flat_only",
+                "action": "store_true",
+                "default": False,
+                "help": "Evaluate only the policy's native flat-ground environment.",
+            },
+            {
                 "name": "--checkpoints",
                 "type": str,
                 "default": ",".join(str(value) for value in DEFAULT_CHECKPOINTS),
@@ -80,7 +149,7 @@ def parse_args():
             {
                 "name": "--sample_seconds",
                 "type": float,
-                "default": 1.6,
+                "default": 60.0,
                 "help": "Maximum telemetry duration for each terrain phase.",
             },
             {
@@ -93,7 +162,15 @@ def parse_args():
     )
     if args.slope_angle not in TASKS:
         raise ValueError(f"slope_angle must be one of {tuple(TASKS)}, got {args.slope_angle}")
-    args.task = TASKS[args.slope_angle]["task"]
+    if args.policy_profile is not None and args.policy_profile not in POLICY_PROFILES:
+        raise ValueError(
+            f"policy_profile must be one of {tuple(POLICY_PROFILES)}, "
+            f"got {args.policy_profile}"
+        )
+    if args.policy_profile is None:
+        args.task = TASKS[args.slope_angle]["task"]
+    else:
+        args.task = POLICY_PROFILES[args.policy_profile]["task"]
     args.num_envs = 1
     args.headless = True
     return args
@@ -106,18 +183,27 @@ def parse_checkpoints(raw_value):
     return checkpoints
 
 
-def configure_evaluation(env_cfg, angle, total_seconds):
+def configure_evaluation(
+    env_cfg,
+    angle,
+    total_seconds,
+    measure_heights=True,
+    flat_only=False,
+):
     env_cfg.env.num_envs = 1
     env_cfg.env.test = False
     env_cfg.env.episode_length_s = max(30.0, total_seconds + 2.0)
     env_cfg.env.enable_camera_sensors = False
     env_cfg.init_state.turn_over = False
 
-    env_cfg.terrain.mesh_type = "trimesh"
+    env_cfg.terrain.mesh_type = "plane" if flat_only else "trimesh"
     env_cfg.terrain.terrain_style = "mgdp_parkour"
     env_cfg.terrain.curriculum = False
     env_cfg.terrain.selected = False
-    env_cfg.terrain.measure_heights = True
+    # The standard 45-D proprioceptive policies were trained with one scalar
+    # critic height value. Enabling the 187-point scan would silently change
+    # their privileged-observation shape during evaluation.
+    env_cfg.terrain.measure_heights = measure_heights
     env_cfg.terrain.num_rows = 1
     env_cfg.terrain.num_cols = 1
     env_cfg.terrain.terrain_length = 45.0
@@ -126,6 +212,8 @@ def configure_evaluation(env_cfg, angle, total_seconds):
     env_cfg.terrain.start_platform_length = 10.0
     env_cfg.terrain.start_platform_width = 2.4
     env_cfg.terrain.ramp_max_angle_deg = float(angle)
+    env_cfg.terrain.mgdp_max_difficulty = 0.9
+    env_cfg.terrain.mgdp_add_roughness = False
     env_cfg.terrain.max_init_terrain_level = 0
     env_cfg.terrain.reset_when_outside_block = False
     env_cfg.terrain.random_section_spawn_start_iter = 10**9
@@ -222,6 +310,38 @@ def get_center_of_mass_state(env, masses, local_com):
     return center_position, center_velocity
 
 
+def sample_heightfield(env, xy_world):
+    """Sample the collision height field at arbitrary world XY positions."""
+    points = xy_world + float(env.terrain.cfg.border_size)
+    points = torch.floor(points / float(env.terrain.cfg.horizontal_scale)).long()
+    px = torch.clip(points[:, 0], 0, env.height_samples.shape[0] - 2)
+    py = torch.clip(points[:, 1], 0, env.height_samples.shape[1] - 2)
+    heights = torch.minimum(
+        env.height_samples[px, py],
+        env.height_samples[px + 1, py],
+    )
+    heights = torch.minimum(heights, env.height_samples[px, py + 1])
+    return heights * float(env.terrain.cfg.vertical_scale)
+
+
+def sample_height_and_slope(env, xy_world, half_span=0.20):
+    if hasattr(env, "_sample_heightfield") and hasattr(env, "_sample_longitudinal_slope"):
+        return (
+            env._sample_heightfield(xy_world),
+            env._sample_longitudinal_slope(xy_world, half_span=half_span),
+        )
+
+    center_height = sample_heightfield(env, xy_world)
+    backward = xy_world.clone()
+    forward = xy_world.clone()
+    backward[:, 0] -= half_span
+    forward[:, 0] += half_span
+    slope = (sample_heightfield(env, forward) - sample_heightfield(env, backward)) / (
+        2.0 * half_span
+    )
+    return center_height, slope
+
+
 def resolve_joint_groups(dof_names):
     missing = [
         name
@@ -239,9 +359,11 @@ def resolve_joint_groups(dof_names):
 
 def reset_runner_inference_state(runner, env):
     dones = torch.ones(env.num_envs, dtype=torch.bool, device=env.device)
-    if hasattr(runner.alg.estimator, "reset"):
-        runner.alg.estimator.reset(dones)
-    runner.history.zero_()
+    estimator = getattr(runner.alg, "estimator", None)
+    if estimator is not None and hasattr(estimator, "reset"):
+        estimator.reset(dones)
+    if hasattr(runner, "history"):
+        runner.history.zero_()
     if hasattr(runner, "_reset_swav_history"):
         runner._reset_swav_history(dones)
     runner.latest_inference_mcp_code = None
@@ -258,12 +380,17 @@ def place_robot_at_phase(env, phase, checkpoint):
     env.reset_idx(env_ids)
     env.common_step_counter = checkpoint * env.num_steps_per_env
 
-    block_start_x = env.env_origins[0, 0] - 0.5 * float(env.cfg.terrain.terrain_length)
-    world_x = block_start_x + float(PHASE_LOCAL_X[phase])
-    world_y = env.env_origins[0, 1]
-    xy_world = torch.stack((world_x, world_y)).reshape(1, 2)
-    slope = env._sample_longitudinal_slope(xy_world)
-    ground_height = env._sample_heightfield(xy_world)
+    if env.cfg.terrain.mesh_type == "plane":
+        world_x = env.env_origins[0, 0]
+        world_y = env.env_origins[0, 1]
+        ground_height = torch.zeros(1, dtype=torch.float, device=env.device)
+        slope = torch.zeros_like(ground_height)
+    else:
+        block_start_x = env.env_origins[0, 0] - 0.5 * float(env.cfg.terrain.terrain_length)
+        world_x = block_start_x + float(PHASE_LOCAL_X[phase])
+        world_y = env.env_origins[0, 1]
+        xy_world = torch.stack((world_x, world_y)).reshape(1, 2)
+        ground_height, slope = sample_height_and_slope(env, xy_world)
     normal_z = torch.rsqrt(1.0 + torch.square(slope))
 
     env.root_states[0] = env.base_init_state
@@ -320,53 +447,83 @@ def collect_phase(
     masses,
     local_com,
 ):
-    reset_runner_inference_state(runner, env)
-    obs = place_robot_at_phase(env, phase, checkpoint)
-
     warmup_failed = False
-    with torch.no_grad():
-        for _ in range(warmup_steps):
-            set_fixed_command(env)
-            actions = policy(obs.detach())
-            obs, _, _, dones, _ = env.step(actions.detach())
-            if bool(dones[0]):
-                warmup_failed = True
-                break
+    rollout_restarts = 0
+    attempted_steps = 0
+    joint_velocity = []
+    torque = []
+    power = []
+    com_position = []
+    com_velocity = []
+    foot_contact_force = []
 
-        if warmup_failed:
+    def phase_is_active():
+        if env.cfg.terrain.mesh_type == "plane":
+            return phase == "flat"
+        xy_world = env.root_states[0, :2].reshape(1, 2)
+        _, slope = sample_height_and_slope(env, xy_world)
+        threshold = np.tan(np.deg2rad(5.0))
+        slope_value = float(slope[0])
+        if phase == "uphill":
+            return slope_value > threshold
+        if phase == "downhill":
+            return slope_value < -threshold
+        return abs(slope_value) <= threshold
+
+    with torch.no_grad():
+        while len(joint_velocity) < sample_steps:
             reset_runner_inference_state(runner, env)
             obs = place_robot_at_phase(env, phase, checkpoint)
+            cycle_failed = False
+            for _ in range(warmup_steps):
+                set_fixed_command(env)
+                actions = policy(obs.detach())
+                obs, _, _, dones, _ = env.step(actions.detach())
+                attempted_steps += 1
+                if bool(dones[0]) or not phase_is_active():
+                    cycle_failed = True
+                    warmup_failed = True
+                    break
+            if cycle_failed:
+                rollout_restarts += 1
+                if attempted_steps > sample_steps * 20:
+                    break
+                continue
 
-        joint_velocity = []
-        torque = []
-        power = []
-        com_position = []
-        com_velocity = []
-        terminated_early = False
+            samples_before_cycle = len(joint_velocity)
+            while len(joint_velocity) < sample_steps:
+                set_fixed_command(env)
+                actions = policy(obs.detach())
+                obs, _, _, dones, _ = env.step(actions.detach())
+                attempted_steps += 1
+                if bool(dones[0]) or not phase_is_active():
+                    break
 
-        for _ in range(sample_steps):
-            set_fixed_command(env)
-            actions = policy(obs.detach())
-            obs, _, _, dones, _ = env.step(actions.detach())
-            if bool(dones[0]):
-                terminated_early = True
+                dof_velocity = env.dof_vel[0].detach()
+                applied_torque = env.torques[0].detach()
+                center_position, center_velocity = get_center_of_mass_state(
+                    env, masses, local_com
+                )
+                contact_force = torch.norm(
+                    env.contact_forces[0, env.trot_feet_indices, :], dim=-1
+                )
+                joint_velocity.append(dof_velocity.cpu().numpy().copy())
+                torque.append(applied_torque.cpu().numpy().copy())
+                power.append((applied_torque * dof_velocity).cpu().numpy().copy())
+                com_position.append(center_position.detach().cpu().numpy().copy())
+                com_velocity.append(center_velocity.detach().cpu().numpy().copy())
+                foot_contact_force.append(contact_force.detach().cpu().numpy().copy())
+
+            if len(joint_velocity) < sample_steps:
+                rollout_restarts += 1
+            if len(joint_velocity) == samples_before_cycle and attempted_steps > sample_steps * 20:
                 break
-
-            dof_velocity = env.dof_vel[0].detach()
-            applied_torque = env.torques[0].detach()
-            center_position, center_velocity = get_center_of_mass_state(
-                env, masses, local_com
-            )
-            joint_velocity.append(dof_velocity.cpu().numpy().copy())
-            torque.append(applied_torque.cpu().numpy().copy())
-            power.append((applied_torque * dof_velocity).cpu().numpy().copy())
-            com_position.append(center_position.detach().cpu().numpy().copy())
-            com_velocity.append(center_velocity.detach().cpu().numpy().copy())
 
     count = len(joint_velocity)
     time = (np.arange(count, dtype=np.float64) + 1.0) * env.dt
     empty_joint = np.empty((0, env.num_actions), dtype=np.float32)
     empty_com = np.empty((0, 3), dtype=np.float32)
+    empty_feet = np.empty((0, 4), dtype=np.float32)
     return {
         "checkpoint": checkpoint,
         "phase": phase,
@@ -376,8 +533,12 @@ def collect_phase(
         "power": np.asarray(power) if count else empty_joint.copy(),
         "com_position": np.asarray(com_position) if count else empty_com,
         "com_velocity": np.asarray(com_velocity) if count else empty_com.copy(),
-        "terminated_early": terminated_early,
+        "foot_contact_force": (
+            np.asarray(foot_contact_force) if count else empty_feet
+        ),
+        "terminated_early": count < sample_steps,
         "warmup_failed": warmup_failed,
+        "rollout_restarts": rollout_restarts,
         "requested_samples": sample_steps,
     }
 
@@ -416,6 +577,14 @@ def build_limits(all_data, joint_groups):
                 limits[(phase, metric, component)] = padded_limits(
                     np.concatenate(arrays) if arrays else np.asarray([])
                 )
+        contact_arrays = [
+            data["foot_contact_force"].reshape(-1)
+            for data in phase_data
+            if data["foot_contact_force"].size
+        ]
+        limits[(phase, "foot_contact_force")] = padded_limits(
+            np.concatenate(contact_arrays) if contact_arrays else np.asarray([])
+        )
     return limits
 
 
@@ -513,7 +682,56 @@ def plot_com(
     plt.close(fig)
 
 
-def render_all_plots(all_data, joint_groups, output_dir, angle, dpi, sample_seconds):
+def plot_foot_contact_force(data, angle, output_path, y_limit, dpi, sample_seconds):
+    fig, ax = plt.subplots(figsize=(12, 6.2), constrained_layout=True)
+    if not add_no_data_message(ax, data):
+        for foot_index, (leg, color) in enumerate(zip(LEG_ORDER, COLORS)):
+            ax.plot(
+                data["time"],
+                data["foot_contact_force"][:, foot_index],
+                label=f"{leg} foot",
+                color=color,
+                linewidth=1.15,
+            )
+        ax.legend(ncol=4, loc="upper center", frameon=False)
+        finite_force = data["foot_contact_force"][
+            np.isfinite(data["foot_contact_force"])
+        ]
+        if finite_force.size:
+            peak_force = float(finite_force.max())
+            readable_top = max(1.0, 1.08 * float(np.percentile(finite_force, 99.9)))
+            y_limit = (-0.03 * readable_top, readable_top)
+            if peak_force > readable_top:
+                ax.text(
+                    0.995,
+                    0.93,
+                    f"Peak {peak_force:.1f} N (above display range)",
+                    ha="right",
+                    va="top",
+                    transform=ax.transAxes,
+                    fontsize=9,
+                    color="0.30",
+                )
+    end_time = max(sample_seconds, float(data["time"][-1]) if data["time"].size else 0.0)
+    style_axis(ax, "Contact force magnitude (N)", (0.0, end_time), y_limit)
+    status = " | incomplete" if data["terminated_early"] else ""
+    ax.set_title(
+        f"{angle} deg | Checkpoint {data['checkpoint']} | "
+        f"{PHASE_LABELS[data['phase']]} | Foot-Ground Contact Force{status}"
+    )
+    fig.savefig(output_path, dpi=dpi)
+    plt.close(fig)
+
+
+def render_all_plots(
+    all_data,
+    joint_groups,
+    output_dir,
+    angle,
+    dpi,
+    sample_seconds,
+    flat_only=False,
+):
     limits = build_limits(all_data, joint_groups)
     joint_metrics = (
         ("joint_velocity", "Joint velocity (rad/s)", "Joint Velocity"),
@@ -522,7 +740,9 @@ def render_all_plots(all_data, joint_groups, output_dir, angle, dpi, sample_seco
     )
     for data in all_data:
         phase = data["phase"]
-        phase_dir = output_dir / f"checkpoint_{data['checkpoint']}" / phase
+        phase_dir = output_dir / f"checkpoint_{data['checkpoint']}"
+        if not flat_only:
+            phase_dir = phase_dir / phase
         phase_dir.mkdir(parents=True, exist_ok=True)
         for metric, ylabel, title in joint_metrics:
             for group, indices in joint_groups.items():
@@ -551,6 +771,22 @@ def render_all_plots(all_data, joint_groups, output_dir, angle, dpi, sample_seco
             dpi,
             sample_seconds,
         )
+        plot_foot_contact_force(
+            data,
+            angle,
+            phase_dir / "foot_contact_force.png",
+            limits[(phase, "foot_contact_force")],
+            dpi,
+            sample_seconds,
+        )
+        np.savez_compressed(
+            phase_dir / "telemetry.npz",
+            **{
+                key: value
+                for key, value in data.items()
+                if isinstance(value, np.ndarray)
+            },
+        )
         plot_com(
             data,
             angle,
@@ -571,29 +807,63 @@ def main():
     if args.warmup_seconds < 0.0 or args.sample_seconds <= 0.0:
         raise ValueError("warmup_seconds must be non-negative and sample_seconds positive")
 
-    task_info = TASKS[args.slope_angle]
-    run_name = args.load_run if args.load_run not in (None, "-1") else task_info["run"]
-    run_dir = (
-        Path(LEGGED_GYM_ROOT_DIR)
-        / "logs"
-        / task_info["experiment"]
-        / str(run_name)
-    )
-    checkpoint_paths = {
-        checkpoint: run_dir / f"model_{checkpoint}.pt" for checkpoint in checkpoints
-    }
+    if args.policy_profile is None:
+        task_info = TASKS[args.slope_angle]
+        run_name = args.load_run if args.load_run not in (None, "-1") else task_info["run"]
+        run_dir = (
+            Path(LEGGED_GYM_ROOT_DIR)
+            / "logs"
+            / task_info["experiment"]
+            / str(run_name)
+        )
+        checkpoint_paths = {
+            checkpoint: run_dir / f"model_{checkpoint}.pt" for checkpoint in checkpoints
+        }
+    else:
+        profile = POLICY_PROFILES[args.policy_profile]
+        unsupported = [
+            checkpoint for checkpoint in checkpoints if checkpoint not in profile["checkpoints"]
+        ]
+        if unsupported:
+            raise ValueError(
+                f"Profile {args.policy_profile} has no checkpoint mapping for {unsupported}"
+            )
+        checkpoint_paths = {}
+        for checkpoint in checkpoints:
+            experiment, run_name, stored_checkpoint = profile["checkpoints"][checkpoint]
+            checkpoint_paths[checkpoint] = (
+                Path(LEGGED_GYM_ROOT_DIR)
+                / "logs"
+                / experiment
+                / run_name
+                / f"model_{stored_checkpoint}.pt"
+            )
+        run_dir = Path(LEGGED_GYM_ROOT_DIR) / "logs" / profile["experiment"] / profile["run"]
     missing = [str(path) for path in checkpoint_paths.values() if not path.is_file()]
     if missing:
         raise FileNotFoundError(f"Missing checkpoints: {missing}")
 
-    output_dir = Path(args.output_dir) if args.output_dir else Path("good_result") / str(args.slope_angle)
+    if args.output_dir:
+        output_dir = Path(args.output_dir)
+    elif args.policy_profile is None:
+        output_dir = Path("good_result") / TASKS[args.slope_angle]["task"]
+    elif args.flat_only:
+        output_dir = Path("good_result") / args.policy_profile
+    else:
+        output_dir = Path("good_result") / args.policy_profile / f"{args.slope_angle}deg"
     if not output_dir.is_absolute():
         output_dir = Path(LEGGED_GYM_ROOT_DIR) / output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
     total_seconds = args.warmup_seconds + args.sample_seconds
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
-    configure_evaluation(env_cfg, args.slope_angle, total_seconds)
+    configure_evaluation(
+        env_cfg,
+        args.slope_angle,
+        total_seconds,
+        measure_heights=args.policy_profile is None,
+        flat_only=args.flat_only,
+    )
     env, _ = task_registry.make_env(name=args.task, args=args, env_cfg=env_cfg)
     train_cfg.runner.resume = False
     train_cfg.runner.warm_start_path = None
@@ -623,11 +893,15 @@ def main():
         checkpoint_path = checkpoint_paths[checkpoint]
         print(f"Loading checkpoint {checkpoint}: {checkpoint_path}")
         runner.load(str(checkpoint_path), load_optimizer=False)
-        policy = runner.get_inference_policy(
-            device=env.device,
-            random_token_dropout=False,
-        )
-        for phase in PHASE_LOCAL_X:
+        try:
+            policy = runner.get_inference_policy(
+                device=env.device,
+                random_token_dropout=False,
+            )
+        except TypeError:
+            policy = runner.get_inference_policy(device=env.device)
+        phases = ("flat",) if args.flat_only else tuple(PHASE_LOCAL_X)
+        for phase in phases:
             print(f"  Collecting {phase}")
             data = collect_phase(
                 env,
@@ -643,6 +917,7 @@ def main():
             print(
                 f"    samples={len(data['time'])}/{sample_steps}, "
                 f"warmup_failed={data['warmup_failed']}, "
+                f"rollout_restarts={data['rollout_restarts']}, "
                 f"terminated_early={data['terminated_early']}"
             )
             all_data.append(data)
@@ -651,13 +926,18 @@ def main():
         all_data,
         joint_groups,
         output_dir,
-        args.slope_angle,
+        0 if args.flat_only else args.slope_angle,
         args.plot_dpi,
         args.sample_seconds,
+        flat_only=args.flat_only,
     )
-    image_count = len(list(output_dir.glob("checkpoint_*/*/*.png")))
+    if args.flat_only:
+        image_count = len(list(output_dir.glob("checkpoint_*/*.png")))
+    else:
+        image_count = len(list(output_dir.glob("checkpoint_*/*/*.png")))
     print(f"Saved {image_count} PNG files to {output_dir}")
-    if image_count != len(checkpoints) * len(PHASE_LOCAL_X) * 11:
+    phase_count = 1 if args.flat_only else len(PHASE_LOCAL_X)
+    if image_count != len(checkpoints) * phase_count * 12:
         raise RuntimeError(f"Unexpected image count: {image_count}")
     env.gym.destroy_sim(env.sim)
 

@@ -22,6 +22,13 @@ from legged_gym.envs.rm75.rm75_config_visual_ramp_trot_35deg import (
     RM75VisualRampTrot35DegCfg,
     RM75VisualRampTrot35DegCfgPPO,
 )
+from legged_gym.envs.rm75.rm75_config_visual_ramp_trot_35deg_torque_limited import (
+    RM75TorqueLimitedVisualRampTrot35DegCfg,
+    RM75TorqueLimitedVisualRampTrot35DegCfgPPO,
+)
+from legged_gym.envs.rm75.rm75_torque_limited_visual_ramp_trot_env import (
+    RM75TorqueLimitedVisualRampTrotRobot,
+)
 from .base.legged_robot import LeggedRobot
 
 from legged_gym.utils.task_registry import task_registry
@@ -55,4 +62,10 @@ task_registry.register(
     RM75VisualRampTrotRobot,
     RM75VisualRampTrot35DegCfg(),
     RM75VisualRampTrot35DegCfgPPO(),
+)
+task_registry.register(
+    "RM75_visual_ramp_trot_3ms_35deg_hip100_knee160",
+    RM75TorqueLimitedVisualRampTrotRobot,
+    RM75TorqueLimitedVisualRampTrot35DegCfg(),
+    RM75TorqueLimitedVisualRampTrot35DegCfgPPO(),
 )

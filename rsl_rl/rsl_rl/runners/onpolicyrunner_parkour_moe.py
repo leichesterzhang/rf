@@ -902,6 +902,7 @@ class OnPolicyRunnerParkourMoE:
             {
                 "actor_critic_state_dict": self.alg.actor_critic.state_dict(),
                 "estimator_state_dict": self.alg.estimator.state_dict(),
+                "policy_class_name": self.cfg["policy_class_name"],
                 "policy_cfg": self.policy_cfg,
                 "estimator_cfg": self.estimator_cfg,
             },

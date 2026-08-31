@@ -28,7 +28,7 @@ sys.path.append(str(PATH_PARENT))
 from utils import MujocoRenderUtils
 
 from legged_gym import LEGGED_GYM_ROOT_DIR
-from rsl_rl.modules import ActorCriticParkourMoE, ParkourEstimator
+from rsl_rl.modules import ActorCriticParkourMoE, ActorCriticVisualResidual, ParkourEstimator
 
 DEFAULT_HEIGHT_SCAN_X = [-0.8, -0.7, -0.6, -0.5, -0.4, -0.3, -0.2, -0.1, 0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
 DEFAULT_HEIGHT_SCAN_Y = [-0.5, -0.4, -0.3, -0.2, -0.1, 0.0, 0.1, 0.2, 0.3, 0.4, 0.5]
@@ -532,6 +532,10 @@ def render_policy_depth_frame(renderer, model, data, camera_id, camera_cfg):
     if depth_format == "buffer":
         depth_image = depth_buffer_to_distance(depth_image, model)
 
+    return postprocess_policy_depth(depth_image, model, camera_cfg)
+
+
+def postprocess_policy_depth(depth_image, model, camera_cfg):
     depth_image = np.nan_to_num(
         depth_image,
         nan=float(camera_cfg["clipping_range"]),
@@ -563,12 +567,76 @@ def render_policy_depth_frame(renderer, model, data, camera_id, camera_cfg):
     return (depth_image / float(camera_cfg["clipping_range"])) - 0.5
 
 
+def render_policy_depth_raycast_frame(model, data, camera_id, camera_cfg):
+    """Render terrain-only metric depth with MuJoCo's deterministic CPU ray caster."""
+    raw_height = int(camera_cfg["raw_height"])
+    raw_width = int(camera_cfg["raw_width"])
+    clipping_range = float(camera_cfg["clipping_range"])
+
+    mujoco.mj_forward(model, data)
+    camera_pos = np.asarray(data.cam_xpos[camera_id], dtype=np.float64).copy()
+    camera_rotation = np.asarray(data.cam_xmat[camera_id], dtype=np.float64).reshape(3, 3)
+
+    vertical_tan = np.tan(np.deg2rad(float(model.cam_fovy[camera_id])) * 0.5)
+    horizontal_tan = vertical_tan * (raw_width / raw_height)
+    pixel_x = (2.0 * (np.arange(raw_width, dtype=np.float64) + 0.5) / raw_width - 1.0) * horizontal_tan
+    pixel_y = (1.0 - 2.0 * (np.arange(raw_height, dtype=np.float64) + 0.5) / raw_height) * vertical_tan
+    grid_x, grid_y = np.meshgrid(pixel_x, pixel_y, indexing="xy")
+    local_directions = np.stack(
+        (grid_x, grid_y, -np.ones_like(grid_x)),
+        axis=-1,
+    ).reshape(-1, 3)
+    local_directions /= np.linalg.norm(local_directions, axis=1, keepdims=True)
+    world_directions = np.ascontiguousarray(local_directions @ camera_rotation.T, dtype=np.float64)
+
+    ray_count = world_directions.shape[0]
+    geom_ids = np.full(ray_count, -1, dtype=np.int32)
+    distances = np.full(ray_count, clipping_range, dtype=np.float64)
+    # The repeated terrain uses group 0. Robot visual and collision geometry
+    # uses groups 2 and 3, so this matches the training proxy's terrain-only depth.
+    terrain_geom_groups = np.array([1, 0, 0, 0, 0, 0], dtype=np.uint8)
+    mujoco.mj_multiRay(
+        model,
+        data,
+        camera_pos,
+        world_directions.reshape(-1),
+        terrain_geom_groups,
+        1,
+        -1,
+        geom_ids,
+        distances,
+        ray_count,
+        clipping_range,
+    )
+    distances[(geom_ids < 0) | (distances < 0.0)] = clipping_range
+    depth_image = distances.reshape(raw_height, raw_width).astype(np.float32)
+    return postprocess_policy_depth(depth_image, model, camera_cfg)
+
+
 def to_numpy(tensor):
     if tensor is None:
         return None
     if isinstance(tensor, np.ndarray):
         return tensor
     return tensor.detach().cpu().numpy()
+
+
+class OpenCVVideoWriter:
+    """Small imageio-compatible fallback for environments without imageio-ffmpeg."""
+
+    def __init__(self, path, fps, frame_size):
+        if cv2 is None:
+            raise RuntimeError("OpenCV is unavailable, so MP4 fallback cannot be created.")
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        self.writer = cv2.VideoWriter(str(path), fourcc, float(fps), tuple(frame_size))
+        if not self.writer.isOpened():
+            raise RuntimeError(f"OpenCV could not open video output: {path}")
+
+    def append_data(self, frame_rgb):
+        self.writer.write(cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR))
+
+    def close(self):
+        self.writer.release()
 
 
 class LegacyPolicyAdapter:
@@ -608,7 +676,24 @@ class ParkourMoEPolicyAdapter:
         else:
             critic_obs_dim = int(actor_state_dict["critic.0.weight"].shape[1] - 1)
 
-        self.actor_critic = ActorCriticParkourMoE(
+        policy_class_name = bundle.get("policy_class_name", None)
+        if policy_class_name is None:
+            policy_class_name = (
+                "ActorCriticVisualResidual"
+                if any(key.startswith("visual_residual.") for key in actor_state_dict)
+                else "ActorCriticParkourMoE"
+            )
+        policy_classes = {
+            "ActorCriticParkourMoE": ActorCriticParkourMoE,
+            "ActorCriticVisualResidual": ActorCriticVisualResidual,
+        }
+        if policy_class_name not in policy_classes:
+            raise ValueError(
+                f"Unsupported bundle policy_class_name={policy_class_name!r}; "
+                f"expected one of {tuple(policy_classes)}"
+            )
+
+        self.actor_critic = policy_classes[policy_class_name](
             num_obs,
             critic_obs_dim,
             num_actions,
@@ -617,6 +702,7 @@ class ParkourMoEPolicyAdapter:
         self.estimator = ParkourEstimator(**bundle["estimator_cfg"]).to(self.device)
 
         self.actor_critic.load_state_dict(actor_state_dict)
+        print(f"Reconstructed bundle policy: {policy_class_name}")
         estimator_load_result = self.estimator.load_state_dict(
             bundle["estimator_state_dict"],
             strict=False,
@@ -1210,18 +1296,25 @@ class PolicyDepthCamera:
         self.depth_buffer = np.zeros((self.buffer_len, self.output_height, self.output_width), dtype=np.float32)
         self.initialized = False
         self.needs_policy_refresh = False
+        self.depth_backend = str(camera_cfg.get("depth_backend", "renderer")).lower()
         self.renderer = None
         self.camera_id = None
 
         if not self.enabled:
             return
 
-        raw_height = int(camera_cfg["raw_height"])
-        raw_width = int(camera_cfg["raw_width"])
-        self.renderer = mujoco.Renderer(model, height=raw_height, width=raw_width)
         self.camera_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_CAMERA, camera_name)
         if self.camera_id < 0:
             raise ValueError(f"Could not find MuJoCo camera '{camera_name}'.")
+        if self.depth_backend == "renderer":
+            raw_height = int(camera_cfg["raw_height"])
+            raw_width = int(camera_cfg["raw_width"])
+            self.renderer = mujoco.Renderer(model, height=raw_height, width=raw_width)
+        elif self.depth_backend != "raycast":
+            raise ValueError(
+                f"Unsupported camera.depth_backend={self.depth_backend!r}; "
+                "expected 'renderer' or 'raycast'."
+            )
 
     def maybe_update(self, counter, model, data):
         if not self.enabled:
@@ -1231,13 +1324,21 @@ class PolicyDepthCamera:
         if not periodic_update:
             return False
 
-        frame = render_policy_depth_frame(
-            self.renderer,
-            model,
-            data,
-            self.camera_id,
-            self.camera_cfg,
-        )
+        if self.depth_backend == "raycast":
+            frame = render_policy_depth_raycast_frame(
+                model,
+                data,
+                self.camera_id,
+                self.camera_cfg,
+            )
+        else:
+            frame = render_policy_depth_frame(
+                self.renderer,
+                model,
+                data,
+                self.camera_id,
+                self.camera_cfg,
+            )
         if not self.initialized:
             self.depth_buffer[:] = frame[np.newaxis, :, :]
             self.initialized = True
@@ -1921,13 +2022,28 @@ def main():
         help="Record one state sample every N MuJoCo steps.",
     )
     parser.add_argument("--duration", type=float, help="Override simulation duration in simulated seconds.")
+    parser.add_argument("--policy-path", help="Override the policy or inference-bundle path from YAML.")
     parser.add_argument("--xml-path", help="Override the terrain XML path from the YAML config.")
     parser.add_argument("--device", help="Override the policy inference device, for example cuda:1 or cpu.")
     parser.add_argument("--cmd-x", type=float, help="Override the initial forward velocity command in m/s.")
     parser.add_argument(
+        "--actuator-torque-limits",
+        help="Comma-separated symmetric actuator torque limits in MuJoCo joint order.",
+    )
+    parser.add_argument(
         "--manual-vision",
         action="store_true",
         help="Force the deployed estimator to use camera observations.",
+    )
+    parser.add_argument(
+        "--deterministic-camera",
+        action="store_true",
+        help="Disable deployment-only depth noise, confidence gating, and random token dropout.",
+    )
+    parser.add_argument(
+        "--camera-depth-backend",
+        choices=("renderer", "raycast"),
+        help="Override the policy depth backend after applying deterministic-camera settings.",
     )
     parser.add_argument(
         "--headless",
@@ -1942,6 +2058,8 @@ def main():
 
     if args.duration is not None:
         config["simulation_duration"] = args.duration
+    if args.policy_path:
+        config["policy_path"] = args.policy_path
     if args.xml_path:
         config["xml_path"] = args.xml_path
     if args.device:
@@ -1950,6 +2068,17 @@ def main():
         config["cmd_init"][0] = args.cmd_x
     if args.manual_vision:
         config.setdefault("camera", {})["manual_vision_flag"] = True
+    if args.deterministic_camera:
+        camera_override = config.setdefault("camera", {})
+        camera_override["depth_backend"] = "raycast"
+        camera_override["use_confidence_mask"] = False
+        camera_override.setdefault("gaussian_noise", {})["enabled"] = False
+        camera_override.setdefault("reflective_noise", {})["enabled"] = False
+        camera_override.setdefault("random_token_dropout", {})["enabled"] = False
+        camera_override.setdefault("token_mask_debug", {})["enabled"] = False
+        camera_override.setdefault("inference_timing", {})["enabled"] = False
+    if args.camera_depth_backend:
+        config.setdefault("camera", {})["depth_backend"] = args.camera_depth_backend
 
     policy_path = resolve_repo_path(config["policy_path"])
     policy_type = infer_policy_type(policy_path, config)
@@ -1974,6 +2103,17 @@ def main():
     num_actions = int(config["num_actions"])
     num_obs = int(config["num_obs"])
     cmd = np.array(config["cmd_init"], dtype=np.float32)
+    actuator_torque_limits = None
+    if args.actuator_torque_limits:
+        actuator_torque_limits = np.array(
+            [float(value.strip()) for value in args.actuator_torque_limits.split(",")],
+            dtype=np.float64,
+        )
+        if actuator_torque_limits.shape != (num_actions,) or np.any(actuator_torque_limits <= 0.0):
+            raise ValueError(
+                "--actuator-torque-limits must contain one positive value per action; "
+                f"expected {num_actions}, got {actuator_torque_limits.tolist()}"
+            )
     depth_preview_cfg = dict(config.get("depth_preview", {}))
     depth_preview_enabled = bool(
         depth_preview_cfg.get("enabled", policy_type == "parkour_moe_bundle")
@@ -2060,6 +2200,15 @@ def main():
         model = mujoco.MjModel.from_xml_path(prepared_xml_path)
         data = mujoco.MjData(model)
         model.opt.timestep = simulation_dt
+        if actuator_torque_limits is not None:
+            if model.nu != num_actions:
+                raise ValueError(
+                    f"MuJoCo model has {model.nu} actuators, but policy has {num_actions} actions."
+                )
+            model.actuator_ctrllimited[:] = True
+            model.actuator_ctrlrange[:, 0] = -actuator_torque_limits
+            model.actuator_ctrlrange[:, 1] = actuator_torque_limits
+            print(f"Applied actuator torque limits: {actuator_torque_limits.tolist()}")
         if not args.no_record_state:
             state_recorder = MujocoStateRecorder(
                 args.action_data_dir,
@@ -2093,7 +2242,11 @@ def main():
             video_fps = 50
             sim_fps = 1.0 / model.opt.timestep
             frame_skip = max(int(sim_fps / video_fps), 1)
-            video_writer = imageio.get_writer(video_path, fps=video_fps)
+            try:
+                video_writer = imageio.get_writer(video_path, fps=video_fps)
+            except (ImportError, ValueError, RuntimeError) as exc:
+                print(f"imageio video backend unavailable ({exc}); using OpenCV mp4v fallback.")
+                video_writer = OpenCVVideoWriter(video_path, video_fps, (640, 360))
             print(
                 f"Video recording will be saved to: {video_path}\n"
                 f"Sim FPS: {sim_fps:.2f}, Video FPS: {video_fps}, Frame Skip: {frame_skip}"

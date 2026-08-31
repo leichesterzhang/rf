@@ -1,0 +1,70 @@
+<mujoco model="RM75 repeated 35 degree visual ramp">
+  <include file="RM75.xml"/>
+
+  <statistic center="6 0 0.7" extent="7"/>
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="-135" elevation="-20"/>
+  </visual>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0"
+             width="512" height="3072"/>
+    <texture type="2d" name="ramp_ground" builtin="checker" mark="edge"
+             rgb1="0.24 0.32 0.38" rgb2="0.12 0.18 0.22" markrgb="0.8 0.8 0.8"
+             width="300" height="300"/>
+    <material name="ramp_ground" texture="ramp_ground" texuniform="true"
+              texrepeat="4 4" reflectance="0.0"/>
+  </asset>
+
+  <worldbody>
+    <light pos="4 0 6" dir="0 0 -1" directional="true"/>
+
+    <!-- Training MGDP ramp geometry at maximum difficulty:
+         2 m flat + 2 m uphill + 2 m summit + 2 m downhill + 4 m flat.
+         The 35 degree ramps rise by 2*tan(35 deg) = 1.400415 m.
+         Twenty 12 m cells cover 240 m, longer than a 60 s rollout at 3 m/s. -->
+    <geom name="lower_surround" type="plane" pos="0 0 -0.6" size="0 0 0.05"
+          material="ramp_ground" friction="0.9 0.02 0.01"/>
+
+    <!-- Shift the first cell by -1 m so the robot starts at the center of the
+         same 2 m reset platform used by Isaac Gym. -->
+    <replicate count="20" offset="12 0 0" sep="_">
+      <geom name="start_flat" type="box" pos="0 0 -0.05" size="1 4.5 0.05"
+            material="ramp_ground" friction="0.9 0.02 0.01" group="1"/>
+      <geom name="uphill" type="box" pos="2 0 0.6592499376"
+            size="1.2207745888 4.5 0.05"
+            quat="0.9537169507 0 -0.3007057995 0" material="ramp_ground"
+            friction="0.9 0.02 0.01" group="1"/>
+      <geom name="summit" type="box" pos="4 0 1.3504150764" size="1 4.5 0.05"
+            material="ramp_ground" friction="0.9 0.02 0.01" group="1"/>
+      <geom name="downhill" type="box" pos="6 0 0.6592499376"
+            size="1.2207745888 4.5 0.05"
+            quat="0.9537169507 0 0.3007057995 0" material="ramp_ground"
+            friction="0.9 0.02 0.01" group="1"/>
+      <geom name="finish_flat" type="box" pos="9 0 -0.05" size="2 4.5 0.05"
+            material="ramp_ground" friction="0.9 0.02 0.01" group="1"/>
+
+      <!-- Terrain-only policy-depth proxy. It keeps the 3 m observation width
+           used for training while the visible collision road above is 9 m wide. -->
+      <geom name="depth_start_flat" type="box" pos="0 0 -0.05" size="1 1.5 0.05"
+            rgba="0 0 0 0.001" contype="0" conaffinity="0" group="0"/>
+      <geom name="depth_uphill" type="box" pos="2 0 0.6592499376"
+            size="1.2207745888 1.5 0.05" quat="0.9537169507 0 -0.3007057995 0"
+            rgba="0 0 0 0.001" contype="0" conaffinity="0" group="0"/>
+      <geom name="depth_summit" type="box" pos="4 0 1.3504150764" size="1 1.5 0.05"
+            rgba="0 0 0 0.001" contype="0" conaffinity="0" group="0"/>
+      <geom name="depth_downhill" type="box" pos="6 0 0.6592499376"
+            size="1.2207745888 1.5 0.05" quat="0.9537169507 0 0.3007057995 0"
+            rgba="0 0 0 0.001" contype="0" conaffinity="0" group="0"/>
+      <geom name="depth_finish_flat" type="box" pos="9 0 -0.05" size="2 1.5 0.05"
+            rgba="0 0 0 0.001" contype="0" conaffinity="0" group="0"/>
+    </replicate>
+  </worldbody>
+
+  <keyframe>
+    <key name="repeated_ramp_start"
+         qpos="0 0 0.53 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"/>
+  </keyframe>
+</mujoco>
