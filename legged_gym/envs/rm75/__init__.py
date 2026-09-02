@@ -26,3 +26,9 @@ from .rm75_config_visual_ramp_trot_35deg_torque_limited import (
 from .rm75_torque_limited_visual_ramp_trot_env import (
     RM75TorqueLimitedVisualRampTrotRobot,
 )
+from .rm75_config_visual_ramp_trot_35deg_torque_variants import (
+    RM75TorqueLimitedVisualRampTrot35DegHip100Knee150Cfg,
+    RM75TorqueLimitedVisualRampTrot35DegHip100Knee150CfgPPO,
+    RM75TorqueLimitedVisualRampTrot35DegHip84Knee150Cfg,
+    RM75TorqueLimitedVisualRampTrot35DegHip84Knee150CfgPPO,
+)
