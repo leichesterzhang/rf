@@ -620,6 +620,24 @@ def play(args):
 
     fixed_command = resolve_play_command(env, args)
     obs = prepare_playback_start(env, fixed_command)
+    record_frames_dir = None
+    recorded_frame_count = 0
+    if args.record_frames_dir is not None:
+        if env.viewer is None:
+            raise RuntimeError("--record_frames_dir requires a non-headless viewer")
+        if args.record_frame_stride <= 0:
+            raise ValueError("--record_frame_stride must be positive")
+        record_frames_dir = os.path.abspath(args.record_frames_dir)
+        os.makedirs(record_frames_dir, exist_ok=True)
+        existing_frames = [
+            name
+            for name in os.listdir(record_frames_dir)
+            if name.startswith("frame_") and name.endswith(".png")
+        ]
+        if existing_frames:
+            raise FileExistsError(
+                f"Recording directory already contains frames: {record_frames_dir}"
+            )
     if fixed_command is None:
         print("Replay command source: environment sampling")
     else:
@@ -808,13 +826,27 @@ def play(args):
         elif SHOW_VELOCITY_TEXT and i % 20 == 0:
             print(" | ".join(get_velocity_overlay_lines(env, DEBUG_ENV_ID)))
         obs, _, rews, dones, infos = env.step(actions.detach())
+        if record_frames_dir is not None and i % args.record_frame_stride == 0:
+            frame_path = os.path.join(
+                record_frames_dir,
+                f"frame_{recorded_frame_count:06d}.png",
+            )
+            env.gym.write_viewer_image_to_file(env.viewer, frame_path)
+            recorded_frame_count += 1
         i += 1
 
     if depth_viewer is not None:
         pygame.quit()
+    if record_frames_dir is not None:
+        print(
+            f"Recorded {recorded_frame_count} viewer frames to "
+            f"{record_frames_dir}"
+        )
 
 if __name__ == '__main__':
-    EXPORT_POLICY = True
+    # Replays are validation by default; exporting on every visualization run
+    # is slow and can overwrite a previously selected deployment artifact.
+    EXPORT_POLICY = False
     RECORD_FRAMES = False
     SHOW_HEIGHT_SCAN = True
     SHOW_RECON_SCAN = True
@@ -886,6 +918,18 @@ if __name__ == '__main__':
                 "type": float,
                 "default": None,
                 "help": "Override the fixed replay yaw rate in rad/s.",
+            },
+            {
+                "name": "--record_frames_dir",
+                "type": str,
+                "default": None,
+                "help": "Write numbered PNG frames from the Isaac Gym viewer.",
+            },
+            {
+                "name": "--record_frame_stride",
+                "type": int,
+                "default": 1,
+                "help": "Capture one viewer frame every N policy steps.",
             },
         ]
     )

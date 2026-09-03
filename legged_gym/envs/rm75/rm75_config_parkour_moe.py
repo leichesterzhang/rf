@@ -111,7 +111,7 @@ class RM75ParkourCfg(GO2ParkourCfg):
             new_heading = [0.0, 0.0]
 
     class asset(GO2ParkourCfg.asset):
-        file = "{LEGGED_GYM_ROOT_DIR}/RM75/urdf/Z1_NOLIDAR.urdf"
+        file = "{LEGGED_GYM_ROOT_DIR}/RM75/urdf/Z1_NOLIDARV11_locked_arm.urdf"
         name = "RM75"
         foot_name = "foot"
         penalize_contacts_on = ["thigh", "calf", "base"]

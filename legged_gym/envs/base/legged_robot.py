@@ -105,6 +105,9 @@ class LeggedRobot(BaseTask):
         if self.cfg.domain_rand.randomize_action_delay:
             actions_start_decimation = torch.randint(0, self.cfg.control.decimation+1, (self.num_envs, 1), device=self.device)
         timed_start = self._timing_start()
+        capture_substep_dynamics = bool(
+            getattr(self, "capture_substep_dynamics", False)
+        )
         for i in range(self.cfg.control.decimation):
             if self.cfg.domain_rand.randomize_action_delay:
                 use_actions = (i >= actions_start_decimation).float()
@@ -114,6 +117,11 @@ class LeggedRobot(BaseTask):
             self.torques = self._compute_torques(input_actions).view(self.torques.shape)
             if self.cfg.domain_rand.randomize_motor_strength:
                 self.torques *= self.motor_strengths
+            if capture_substep_dynamics and i == self.cfg.control.decimation - 1:
+                capture_dof_pos = self.dof_pos.clone()
+                capture_dof_vel = self.dof_vel.clone()
+                capture_root_state = self.root_states.clone()
+                capture_torque = self.torques.clone()
             self.gym.set_dof_actuation_force_tensor(self.sim, gymtorch.unwrap_tensor(self.torques))
             self.gym.simulate(self.sim)
             if self.cfg.env.test:
@@ -125,6 +133,20 @@ class LeggedRobot(BaseTask):
             if self.device == 'cpu':
                 self.gym.fetch_results(self.sim, True)
             self.gym.refresh_dof_state_tensor(self.sim)
+            if capture_substep_dynamics:
+                self.gym.refresh_actor_root_state_tensor(self.sim)
+                if i == self.cfg.control.decimation - 1:
+                    sim_dt = float(self.sim_params.dt)
+                    self.captured_substep_dof_pos = capture_dof_pos
+                    self.captured_substep_dof_vel = capture_dof_vel
+                    self.captured_substep_root_state = capture_root_state
+                    self.captured_substep_torque = capture_torque
+                    self.captured_substep_dof_acc = (
+                        self.dof_vel - capture_dof_vel
+                    ) / sim_dt
+                    self.captured_substep_root_acc = (
+                        self.root_states[:, 7:13] - capture_root_state[:, 7:13]
+                    ) / sim_dt
         self._timing_stop(timed_start, "env_simulate_loop", step_timing)
 
         self._active_step_timing = step_timing

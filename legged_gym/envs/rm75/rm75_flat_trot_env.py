@@ -136,3 +136,16 @@ class RM75FlatTrotRobot(Go2Robot):
             torch.sum(torch.square(feet_xy_velocity), dim=2) * contacts.float(),
             dim=1,
         )
+
+    def _reward_trot_duty_balance(self):
+        """Penalize each foot's duty error relative to the configured target.
+
+        This is intentionally separate from the multiplicative trot score.  A
+        policy can otherwise keep a clean diagonal rhythm while consistently
+        shortening one diagonal pair, which produces the lateral wobble seen in
+        the hip84 policy.
+        """
+        target_duty = float(self.cfg.rewards.trot_target_contact_duty)
+        return torch.mean(
+            torch.square(self.trot_contact_ema - target_duty), dim=1
+        )

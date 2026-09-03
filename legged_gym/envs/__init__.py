@@ -35,6 +35,20 @@ from legged_gym.envs.rm75.rm75_config_visual_ramp_trot_35deg_torque_variants imp
     RM75TorqueLimitedVisualRampTrot35DegHip84Knee150Cfg,
     RM75TorqueLimitedVisualRampTrot35DegHip84Knee150CfgPPO,
 )
+from legged_gym.envs.rm75.rm75_config_newmodel_earth_torque_pipeline import (
+    RM75NewModelEarthFlatHip100Knee150Cfg,
+    RM75NewModelEarthFlatHip100Knee150CfgPPO,
+    RM75NewModelEarthFlatHip84Knee150Cfg,
+    RM75NewModelEarthFlatHip84Knee150CfgPPO,
+    RM75NewModelEarthFlatHip84Knee150RefineCfg,
+    RM75NewModelEarthFlatHip84Knee150RefineCfgPPO,
+    RM75NewModelEarthFlatHip84Knee150RefineV2Cfg,
+    RM75NewModelEarthFlatHip84Knee150RefineV2CfgPPO,
+    RM75NewModelEarthRampHip100Knee150Cfg,
+    RM75NewModelEarthRampHip100Knee150CfgPPO,
+    RM75NewModelEarthRampHip84Knee150Cfg,
+    RM75NewModelEarthRampHip84Knee150CfgPPO,
+)
 from .base.legged_robot import LeggedRobot
 
 from legged_gym.utils.task_registry import task_registry
@@ -86,4 +100,40 @@ task_registry.register(
     RM75TorqueLimitedVisualRampTrotRobot,
     RM75TorqueLimitedVisualRampTrot35DegHip84Knee150Cfg(),
     RM75TorqueLimitedVisualRampTrot35DegHip84Knee150CfgPPO(),
+)
+task_registry.register(
+    "RM75_newmodel_earth_flat_hip100_knee150",
+    RM75TorqueLimitedFlatTrotRobot,
+    RM75NewModelEarthFlatHip100Knee150Cfg(),
+    RM75NewModelEarthFlatHip100Knee150CfgPPO(),
+)
+task_registry.register(
+    "RM75_newmodel_earth_flat_hip84_knee150",
+    RM75TorqueLimitedFlatTrotRobot,
+    RM75NewModelEarthFlatHip84Knee150Cfg(),
+    RM75NewModelEarthFlatHip84Knee150CfgPPO(),
+)
+task_registry.register(
+    "RM75_newmodel_earth_flat_hip84_knee150_refine",
+    RM75TorqueLimitedFlatTrotRobot,
+    RM75NewModelEarthFlatHip84Knee150RefineCfg(),
+    RM75NewModelEarthFlatHip84Knee150RefineCfgPPO(),
+)
+task_registry.register(
+    "RM75_newmodel_earth_flat_hip84_knee150_refine_v2",
+    RM75TorqueLimitedFlatTrotRobot,
+    RM75NewModelEarthFlatHip84Knee150RefineV2Cfg(),
+    RM75NewModelEarthFlatHip84Knee150RefineV2CfgPPO(),
+)
+task_registry.register(
+    "RM75_newmodel_earth_ramp35_hip100_knee150",
+    RM75TorqueLimitedVisualRampTrotRobot,
+    RM75NewModelEarthRampHip100Knee150Cfg(),
+    RM75NewModelEarthRampHip100Knee150CfgPPO(),
+)
+task_registry.register(
+    "RM75_newmodel_earth_ramp35_hip84_knee150",
+    RM75TorqueLimitedVisualRampTrotRobot,
+    RM75NewModelEarthRampHip84Knee150Cfg(),
+    RM75NewModelEarthRampHip84Knee150CfgPPO(),
 )

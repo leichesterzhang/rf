@@ -31,7 +31,53 @@ TASKS = {
         "run": "Aug28_10-22-28_warmstart_torque_model30000",
     },
 }
+VISUAL_PROFILES = {
+    "earth_hip100_knee150": {
+        "task": "RM75_visual_ramp_trot_3ms_35deg_hip100_knee150",
+        "experiment": "RM75_visual_ramp_trot_3ms_35deg_hip100_knee150",
+        "run": "Aug31_22-47-12_warmstart_torque_hip100_knee160_model30000",
+    },
+    "earth_hip84_knee150": {
+        "task": "RM75_visual_ramp_trot_3ms_35deg_hip84_knee150",
+        "experiment": "RM75_visual_ramp_trot_3ms_35deg_hip84_knee150",
+        "run": "Aug31_22-47-12_warmstart_torque_hip100_knee160_model30000",
+    },
+    "lunar_hip100_knee150": {
+        "task": "RM75_lunar_visual_ramp_trot_3ms_35deg_hip100_knee150",
+        "experiment": "RM75_lunar_visual_ramp_trot_3ms_35deg_hip100_knee150",
+        "run": "Aug31_23-02-46_warmstart_lunar_slope_ready_model12000",
+    },
+    "lunar_hip84_knee150": {
+        "task": "RM75_lunar_visual_ramp_trot_3ms_35deg_hip84_knee150",
+        "experiment": "RM75_lunar_visual_ramp_trot_3ms_35deg_hip84_knee150",
+        "run": "Aug31_23-02-46_warmstart_lunar_slope_ready_model12000",
+    },
+}
 POLICY_PROFILES = {
+    "newmodel_earth_hip100_knee150_final": {
+        "task": "RM75_newmodel_earth_flat_hip100_knee150",
+        "experiment": "RM75_newmodel_earth_flat_hip100_knee150",
+        "run": "Sep03_10-20-42_flat_trot_contact_heading_recovery_v3",
+        "checkpoints": {
+            2500: (
+                "RM75_newmodel_earth_flat_hip100_knee150",
+                "Sep03_10-20-42_flat_trot_contact_heading_recovery_v3",
+                2500,
+            ),
+        },
+    },
+    "newmodel_earth_hip84_knee150_final": {
+        "task": "RM75_newmodel_earth_flat_hip84_knee150_refine_v2",
+        "experiment": "RM75_newmodel_earth_flat_hip84_knee150_refine_v2",
+        "run": "Sep03_12-13-12_per_foot_duty_refine_v2",
+        "checkpoints": {
+            200: (
+                "RM75_newmodel_earth_flat_hip84_knee150_refine_v2",
+                "Sep03_12-13-12_per_foot_duty_refine_v2",
+                200,
+            ),
+        },
+    },
     "torque_limited_trot": {
         "task": "RM75_flat_trot_3ms_hip100_knee160",
         "experiment": "RM75_flat_trot_3ms_hip100_knee160",
@@ -114,12 +160,21 @@ def parse_args():
                 "help": "Maximum ramp angle to evaluate: 25 or 35 degrees.",
             },
             {
+                "name": "--visual_profile",
+                "type": str,
+                "default": None,
+                "help": (
+                    "Visual ramp run profile: "
+                    + ", ".join(VISUAL_PROFILES)
+                ),
+            },
+            {
                 "name": "--policy_profile",
                 "type": str,
                 "default": None,
                 "help": (
                     "Optional non-visual policy profile: "
-                    "torque_limited_trot or lunar_1_6g_trot."
+                    + ", ".join(POLICY_PROFILES)
                 ),
             },
             {
@@ -167,7 +222,16 @@ def parse_args():
             f"policy_profile must be one of {tuple(POLICY_PROFILES)}, "
             f"got {args.policy_profile}"
         )
-    if args.policy_profile is None:
+    if args.visual_profile is not None and args.visual_profile not in VISUAL_PROFILES:
+        raise ValueError(
+            f"visual_profile must be one of {tuple(VISUAL_PROFILES)}, "
+            f"got {args.visual_profile}"
+        )
+    if args.visual_profile is not None and args.policy_profile is not None:
+        raise ValueError("visual_profile and policy_profile cannot be combined")
+    if args.visual_profile is not None:
+        args.task = VISUAL_PROFILES[args.visual_profile]["task"]
+    elif args.policy_profile is None:
         args.task = TASKS[args.slope_angle]["task"]
     else:
         args.task = POLICY_PROFILES[args.policy_profile]["task"]
@@ -267,6 +331,8 @@ def configure_evaluation(
     for flag_name in deterministic_flags:
         if hasattr(env_cfg.domain_rand, flag_name):
             setattr(env_cfg.domain_rand, flag_name, False)
+    if hasattr(env_cfg.domain_rand, "robustness_start_iter"):
+        env_cfg.domain_rand.robustness_start_iter = 10**9
     env_cfg.rewards.no_progress_timeout_s = 0.0
 
     env_cfg.camera.xyz_error = [0.0, 0.0]
@@ -455,6 +521,9 @@ def collect_phase(
     power = []
     com_position = []
     com_velocity = []
+    command_velocity = []
+    terrain_tangent_speed = []
+    terrain_target_speed = []
     foot_contact_force = []
 
     def phase_is_active():
@@ -512,6 +581,17 @@ def collect_phase(
                 power.append((applied_torque * dof_velocity).cpu().numpy().copy())
                 com_position.append(center_position.detach().cpu().numpy().copy())
                 com_velocity.append(center_velocity.detach().cpu().numpy().copy())
+                command_velocity.append(
+                    env.commands[0, :3].detach().cpu().numpy().copy()
+                )
+                tangent_speed = getattr(env, "terrain_tangent_speed", center_velocity[0])
+                target_speed = getattr(env, "terrain_target_speed", env.commands[0, 0])
+                if torch.is_tensor(tangent_speed):
+                    tangent_speed = tangent_speed.reshape(-1)[0].item()
+                if torch.is_tensor(target_speed):
+                    target_speed = target_speed.reshape(-1)[0].item()
+                terrain_tangent_speed.append(float(tangent_speed))
+                terrain_target_speed.append(float(target_speed))
                 foot_contact_force.append(contact_force.detach().cpu().numpy().copy())
 
             if len(joint_velocity) < sample_steps:
@@ -533,6 +613,19 @@ def collect_phase(
         "power": np.asarray(power) if count else empty_joint.copy(),
         "com_position": np.asarray(com_position) if count else empty_com,
         "com_velocity": np.asarray(com_velocity) if count else empty_com.copy(),
+        "command_velocity": (
+            np.asarray(command_velocity) if count else empty_com.copy()
+        ),
+        "terrain_tangent_speed": (
+            np.asarray(terrain_tangent_speed, dtype=np.float32)
+            if count
+            else np.empty((0,), dtype=np.float32)
+        ),
+        "terrain_target_speed": (
+            np.asarray(terrain_target_speed, dtype=np.float32)
+            if count
+            else np.empty((0,), dtype=np.float32)
+        ),
         "foot_contact_force": (
             np.asarray(foot_contact_force) if count else empty_feet
         ),
@@ -574,9 +667,26 @@ def build_limits(all_data, joint_groups):
                     for data in phase_data
                     if data[metric].size
                 ]
+                if metric == "com_velocity" and component < 2:
+                    arrays.extend(
+                        data["command_velocity"][:, component]
+                        for data in phase_data
+                        if data["command_velocity"].size
+                    )
                 limits[(phase, metric, component)] = padded_limits(
                     np.concatenate(arrays) if arrays else np.asarray([])
                 )
+        terrain_speed_arrays = [
+            data[key]
+            for data in phase_data
+            for key in ("terrain_tangent_speed", "terrain_target_speed")
+            if data[key].size
+        ]
+        limits[(phase, "terrain_speed")] = padded_limits(
+            np.concatenate(terrain_speed_arrays)
+            if terrain_speed_arrays
+            else np.asarray([])
+        )
         contact_arrays = [
             data["foot_contact_force"].reshape(-1)
             for data in phase_data
@@ -677,6 +787,75 @@ def plot_com(
     axes[0].set_title(
         f"{angle} deg | Checkpoint {data['checkpoint']} | "
         f"{PHASE_LABELS[data['phase']]} | {title}{status}"
+    )
+    fig.savefig(output_path, dpi=dpi)
+    plt.close(fig)
+
+
+def plot_com_velocity(
+    data,
+    angle,
+    output_path,
+    component_limits,
+    terrain_speed_limit,
+    dpi,
+    sample_seconds,
+):
+    fig, axes = plt.subplots(4, 1, figsize=(12, 11.8), sharex=True, constrained_layout=True)
+    end_time = max(sample_seconds, float(data["time"][-1]) if data["time"].size else 0.0)
+    labels = ("CoM vx", "CoM vy", "CoM vz")
+    for component, (ax, label, color, y_limit) in enumerate(
+        zip(axes[:3], labels, COLORS[:3], component_limits)
+    ):
+        if not add_no_data_message(ax, data):
+            ax.plot(
+                data["time"],
+                data["com_velocity"][:, component],
+                label=label,
+                color=color,
+                linewidth=1.3,
+            )
+            if component < 2:
+                ax.plot(
+                    data["time"],
+                    data["command_velocity"][:, component],
+                    label=f"Command v{'x' if component == 0 else 'y'}",
+                    color="0.20",
+                    linestyle="--",
+                    linewidth=1.15,
+                )
+            ax.legend(loc="upper right", frameon=False, ncol=2)
+        style_axis(ax, "Velocity (m/s)", (0.0, end_time), y_limit)
+
+    terrain_ax = axes[3]
+    if not add_no_data_message(terrain_ax, data):
+        terrain_ax.plot(
+            data["time"],
+            data["terrain_tangent_speed"],
+            label="Actual terrain-tangent speed",
+            color=COLORS[0],
+            linewidth=1.3,
+        )
+        terrain_ax.plot(
+            data["time"],
+            data["terrain_target_speed"],
+            label="Terrain target speed",
+            color=COLORS[1],
+            linestyle="--",
+            linewidth=1.25,
+        )
+        terrain_ax.legend(loc="upper right", frameon=False, ncol=2)
+    style_axis(
+        terrain_ax,
+        "Along-terrain speed (m/s)",
+        (0.0, end_time),
+        terrain_speed_limit,
+    )
+    status = " | terminated early" if data["terminated_early"] else ""
+    axes[0].set_title(
+        f"{angle} deg | Checkpoint {data['checkpoint']} | "
+        f"{PHASE_LABELS[data['phase']]} | Whole-body Center-of-Mass Velocity "
+        f"and Speed Targets{status}"
     )
     fig.savefig(output_path, dpi=dpi)
     plt.close(fig)
@@ -787,15 +966,12 @@ def render_all_plots(
                 if isinstance(value, np.ndarray)
             },
         )
-        plot_com(
+        plot_com_velocity(
             data,
             angle,
-            "com_velocity",
-            ("CoM vx", "CoM vy", "CoM vz"),
-            "Velocity (m/s)",
-            "Whole-body Center-of-Mass Velocity",
             phase_dir / "com_velocity.png",
             [limits[(phase, "com_velocity", component)] for component in range(3)],
+            limits[(phase, "terrain_speed")],
             dpi,
             sample_seconds,
         )
@@ -807,7 +983,19 @@ def main():
     if args.warmup_seconds < 0.0 or args.sample_seconds <= 0.0:
         raise ValueError("warmup_seconds must be non-negative and sample_seconds positive")
 
-    if args.policy_profile is None:
+    if args.visual_profile is not None:
+        task_info = VISUAL_PROFILES[args.visual_profile]
+        run_name = args.load_run if args.load_run not in (None, "-1") else task_info["run"]
+        run_dir = (
+            Path(LEGGED_GYM_ROOT_DIR)
+            / "logs"
+            / task_info["experiment"]
+            / str(run_name)
+        )
+        checkpoint_paths = {
+            checkpoint: run_dir / f"model_{checkpoint}.pt" for checkpoint in checkpoints
+        }
+    elif args.policy_profile is None:
         task_info = TASKS[args.slope_angle]
         run_name = args.load_run if args.load_run not in (None, "-1") else task_info["run"]
         run_dir = (
@@ -845,6 +1033,8 @@ def main():
 
     if args.output_dir:
         output_dir = Path(args.output_dir)
+    elif args.visual_profile is not None:
+        output_dir = Path("good_result") / VISUAL_PROFILES[args.visual_profile]["task"]
     elif args.policy_profile is None:
         output_dir = Path("good_result") / TASKS[args.slope_angle]["task"]
     elif args.flat_only:
@@ -932,9 +1122,15 @@ def main():
         flat_only=args.flat_only,
     )
     if args.flat_only:
-        image_count = len(list(output_dir.glob("checkpoint_*/*.png")))
+        image_count = sum(
+            len(list((output_dir / f"checkpoint_{checkpoint}").glob("*.png")))
+            for checkpoint in checkpoints
+        )
     else:
-        image_count = len(list(output_dir.glob("checkpoint_*/*/*.png")))
+        image_count = sum(
+            len(list((output_dir / f"checkpoint_{checkpoint}").glob("*/*.png")))
+            for checkpoint in checkpoints
+        )
     print(f"Saved {image_count} PNG files to {output_dir}")
     phase_count = 1 if args.flat_only else len(PHASE_LOCAL_X)
     if image_count != len(checkpoints) * phase_count * 12:

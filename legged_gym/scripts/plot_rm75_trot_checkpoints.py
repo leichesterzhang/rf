@@ -71,7 +71,8 @@ def parse_args():
             },
         ]
     )
-    args.task = TASK_NAME
+    if not args.task:
+        args.task = TASK_NAME
     args.num_envs = 1
     args.headless = True
     return args
@@ -105,14 +106,16 @@ def configure_evaluation(env_cfg, total_seconds, command_speed):
             setattr(env_cfg.commands.ranges, range_name, [command_speed, command_speed])
     for range_name in (
         "lin_vel_y",
-        "ang_vel_yaw",
         "heading",
         "new_lin_vel_y",
-        "new_ang_vel_yaw",
         "new_heading",
     ):
         if hasattr(env_cfg.commands.ranges, range_name):
             setattr(env_cfg.commands.ranges, range_name, [0.0, 0.0])
+    yaw_range = [-1.0, 1.0] if env_cfg.commands.heading_command else [0.0, 0.0]
+    for range_name in ("ang_vel_yaw", "new_ang_vel_yaw"):
+        if hasattr(env_cfg.commands.ranges, range_name):
+            setattr(env_cfg.commands.ranges, range_name, yaw_range)
 
     deterministic_flags = (
         "randomize_friction",
@@ -244,11 +247,21 @@ def collect_checkpoint(
     obs = reset_deterministically(env, command_speed, seed)
     env.common_step_counter = checkpoint * env.num_steps_per_env
 
+    joint_position = []
     joint_velocity = []
     torque = []
     power = []
     com_position = []
     com_velocity = []
+    foot_contact_force = []
+    root_state = []
+    substep_joint_position = []
+    substep_joint_velocity = []
+    substep_joint_acceleration = []
+    substep_root_state = []
+    substep_root_acceleration = []
+    substep_torque = []
+    body_contact_force = []
     reset_steps = []
 
     with torch.no_grad():
@@ -261,17 +274,45 @@ def collect_checkpoint(
                 continue
 
             sample_index = step - warmup_steps
+            dof_position = env.dof_pos[0].detach()
             dof_velocity = env.dof_vel[0].detach()
             applied_torque = env.torques[0].detach()
             center_position, center_velocity = get_center_of_mass_state(
                 env, masses, local_com
             )
+            contact_force = torch.norm(
+                env.contact_forces[0, env.trot_feet_indices, :], dim=-1
+            )
 
+            joint_position.append(dof_position.cpu().numpy().copy())
             joint_velocity.append(dof_velocity.cpu().numpy().copy())
             torque.append(applied_torque.cpu().numpy().copy())
             power.append((applied_torque * dof_velocity).cpu().numpy().copy())
             com_position.append(center_position.detach().cpu().numpy().copy())
             com_velocity.append(center_velocity.detach().cpu().numpy().copy())
+            foot_contact_force.append(contact_force.detach().cpu().numpy().copy())
+            root_state.append(env.root_states[0].detach().cpu().numpy().copy())
+            substep_joint_position.append(
+                env.captured_substep_dof_pos[0].detach().cpu().numpy().copy()
+            )
+            substep_joint_velocity.append(
+                env.captured_substep_dof_vel[0].detach().cpu().numpy().copy()
+            )
+            substep_joint_acceleration.append(
+                env.captured_substep_dof_acc[0].detach().cpu().numpy().copy()
+            )
+            substep_root_state.append(
+                env.captured_substep_root_state[0].detach().cpu().numpy().copy()
+            )
+            substep_root_acceleration.append(
+                env.captured_substep_root_acc[0].detach().cpu().numpy().copy()
+            )
+            substep_torque.append(
+                env.captured_substep_torque[0].detach().cpu().numpy().copy()
+            )
+            body_contact_force.append(
+                env.contact_forces[0].detach().cpu().numpy().copy()
+            )
             if bool(dones[0]):
                 reset_steps.append(sample_index)
 
@@ -279,11 +320,25 @@ def collect_checkpoint(
     return {
         "checkpoint": checkpoint,
         "time": time,
+        "joint_names": np.asarray(env.dof_names),
+        "joint_position": np.asarray(joint_position),
         "joint_velocity": np.asarray(joint_velocity),
         "torque": np.asarray(torque),
         "power": np.asarray(power),
         "com_position": np.asarray(com_position),
         "com_velocity": np.asarray(com_velocity),
+        "foot_contact_force": np.asarray(foot_contact_force),
+        "root_state": np.asarray(root_state),
+        "substep_joint_position": np.asarray(substep_joint_position),
+        "substep_joint_velocity": np.asarray(substep_joint_velocity),
+        "substep_joint_acceleration": np.asarray(substep_joint_acceleration),
+        "substep_root_state": np.asarray(substep_root_state),
+        "substep_root_acceleration": np.asarray(substep_root_acceleration),
+        "substep_torque": np.asarray(substep_torque),
+        "body_names": np.asarray(
+            env.gym.get_asset_rigid_body_names(env.robot_asset)
+        ),
+        "body_contact_force": np.asarray(body_contact_force),
         "reset_steps": tuple(reset_steps),
     }
 
@@ -373,6 +428,52 @@ def plot_com(data, metric, labels, ylabel, title, output_path, y_limits, dpi):
     plt.close(fig)
 
 
+def plot_foot_contact_force(data, output_path, dpi):
+    fig, ax = plt.subplots(figsize=(12, 6.2), constrained_layout=True)
+    for foot_index, (leg, color) in enumerate(zip(LEG_ORDER, COLORS)):
+        ax.plot(
+            data["time"],
+            data["foot_contact_force"][:, foot_index],
+            label=f"{leg} foot",
+            color=color,
+            linewidth=1.15,
+        )
+
+    finite_force = data["foot_contact_force"][
+        np.isfinite(data["foot_contact_force"])
+    ]
+    y_limit = None
+    if finite_force.size:
+        peak_force = float(finite_force.max())
+        readable_top = max(1.0, 1.08 * float(np.percentile(finite_force, 99.9)))
+        y_limit = (-0.03 * readable_top, readable_top)
+        if peak_force > readable_top:
+            ax.text(
+                0.995,
+                0.93,
+                f"Peak {peak_force:.1f} N (above display range)",
+                ha="right",
+                va="top",
+                transform=ax.transAxes,
+                fontsize=9,
+                color="0.30",
+            )
+
+    add_reset_markers(ax, data)
+    style_axis(
+        ax,
+        "Contact force magnitude (N)",
+        (data["time"][0], data["time"][-1]),
+        y_limit,
+    )
+    ax.set_title(
+        f"Checkpoint {data['checkpoint']} | Foot-Ground Contact Force"
+    )
+    ax.legend(ncol=4, loc="upper center", frameon=False)
+    fig.savefig(output_path, dpi=dpi)
+    plt.close(fig)
+
+
 def build_global_limits(all_data, joint_groups):
     limits = {}
     for metric in ("joint_velocity", "torque", "power"):
@@ -434,6 +535,33 @@ def render_all_plots(all_data, joint_groups, output_dir, dpi):
             y_limits=[limits[("com_velocity", component)] for component in range(3)],
             dpi=dpi,
         )
+        plot_foot_contact_force(
+            data=data,
+            output_path=checkpoint_dir / "foot_contact_force.png",
+            dpi=dpi,
+        )
+        np.savez_compressed(
+            checkpoint_dir / "telemetry.npz",
+            time=data["time"],
+            joint_names=data["joint_names"],
+            joint_position=data["joint_position"],
+            joint_velocity=data["joint_velocity"],
+            joint_torque=data["torque"],
+            joint_power=data["power"],
+            com_position=data["com_position"],
+            com_velocity=data["com_velocity"],
+            foot_contact_force=data["foot_contact_force"],
+            root_state=data["root_state"],
+            substep_joint_position=data["substep_joint_position"],
+            substep_joint_velocity=data["substep_joint_velocity"],
+            substep_joint_acceleration=data["substep_joint_acceleration"],
+            substep_root_state=data["substep_root_state"],
+            substep_root_acceleration=data["substep_root_acceleration"],
+            substep_torque=data["substep_torque"],
+            body_names=data["body_names"],
+            body_contact_force=data["body_contact_force"],
+            reset_steps=np.asarray(data["reset_steps"], dtype=np.int64),
+        )
 
 
 def main():
@@ -443,7 +571,8 @@ def main():
         raise ValueError("warmup_seconds must be non-negative and sample_seconds positive.")
 
     run_name = args.load_run if args.load_run not in (None, "-1") else DEFAULT_RUN
-    run_dir = Path(LEGGED_GYM_ROOT_DIR) / "logs" / "RM75_flat_trot_3ms" / str(run_name)
+    experiment_name = args.experiment_name or args.task
+    run_dir = Path(LEGGED_GYM_ROOT_DIR) / "logs" / str(experiment_name) / str(run_name)
     checkpoint_paths = {
         checkpoint: run_dir / f"model_{checkpoint}.pt" for checkpoint in checkpoints
     }
@@ -456,19 +585,20 @@ def main():
         output_dir = Path(LEGGED_GYM_ROOT_DIR) / output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    env_cfg, train_cfg = task_registry.get_cfgs(name=TASK_NAME)
+    env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
     configure_evaluation(
         env_cfg,
         total_seconds=args.warmup_seconds + args.sample_seconds,
         command_speed=args.command_speed,
     )
     env, _ = task_registry.make_env(
-        name=TASK_NAME, args=args, env_cfg=env_cfg
+        name=args.task, args=args, env_cfg=env_cfg
     )
+    env.capture_substep_dynamics = True
     train_cfg.runner.resume = False
     runner, _ = task_registry.make_alg_runner(
         env=env,
-        name=TASK_NAME,
+        name=args.task,
         args=args,
         train_cfg=train_cfg,
         log_root=None,
