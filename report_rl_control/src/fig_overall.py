@@ -1,88 +1,80 @@
-from figlib import Diagram
+from figlib import Diagram, C
 
-d = Diagram("整体架构", 1240, 580)
-it = dict(italic=True, fs=12)
+C["grp"] = ("#E6EBF3", "#E6EBF3")
+d = Diagram("整体架构", 1080, 420)
+it = dict(italic=True, fs=13)
+d.panel(8, 8, 1064, 404, "整体框架", "gry_bg", fs=14)
 
-# panels
-d.panel(150, 14, 420, 320, "视觉感知与跨模态融合", "blue_bg", fs=13)
-d.panel(590, 14, 260, 320, "读写记忆估计器（约10 Hz）", "org_bg", fs=13)
-d.panel(870, 14, 196, 320, "混合专家策略（50 Hz）", "grn_bg", fs=13)
-d.panel(150, 404, 916, 140, "仅训练阶段使用", "pur_bg", fs=13)
+# ---- inputs
+d.text(18, 92, 60, 22, "D_{t}", fs=15, italic=True, bold=True)
+d.fat([(22, 128), (78, 128)], "blue", bw=10, hl=14, hw=24)
+d.text(18, 236, 60, 22, "O_{t}^{10}", fs=15, italic=True, bold=True)
+d.fat([(22, 270), (78, 270)], "org", bw=10, hl=14, hw=24)
 
-# inputs
-D = d.box(14, 50, 112, 56, "深度图 D_{t}\n58×87", "wht", fs=12)
-O = d.box(14, 180, 112, 56, "本体历史 O_{t}\n10×45", "wht", fs=12)
-OB = d.box(14, 344, 112, 56, "当前观测 o_{t}\n视觉标志 b_{t}", "wht", fs=12)
+# ---- shaded group (perception + fusion + estimator)
+d.box(86, 42, 552, 326, "", "grp", arc=18, sw=0.5)
+VM = d.box(98, 60, 62, 150, "视觉感知模块", "blue", vertical=True, fs=13, sw=1.8, arc=10)
+PM = d.box(98, 228, 62, 90, "本体MLP", "org", vertical=True, fs=13, sw=1.8, arc=10)
+d.fat([(164, 135), (194, 135)], "blue", bw=9, hl=12, hw=20)
+d.fat([(164, 273), (194, 273)], "org", bw=9, hl=12, hw=20)
 
-# perception
-CNN = d.box(170, 50, 100, 56, "深度CNN\n3层卷积", "blue", fs=12)
-d.edge([D.p("r"), CNN.p("l")], D, CNN)
-SM = d.box(304, 50, 106, 56, "主动采样\nK = 16", "blue", fs=12)
-d.edge([CNN.p("r"), SM.p("l")], CNN, SM)
-d.text(268, 82, 40, 18, "88×64", fs=10)
-DEC = d.box(304, 130, 106, 46, "局部解码器", "pur", fs=12, dashed=True)
-d.edge([(287, 78), (287, DEC.cy), DEC.p("l")], None, DEC, dashed=True)
-d.text(304, 178, 106, 18, "→ L_{patch}", fs=11, italic=True)
-PM = d.box(170, 190, 100, 56, "本体MLP", "blue", fs=12)
-d.edge([O.p("r", 0.5), (PM.x, O.cy)], O, PM)
-TF = d.box(440, 110, 110, 150, "跨模态\nTransformer\n(27个token)", "blue", fs=12)
-d.edge([SM.p("r"), (425, 78), (425, 140), (TF.x, 140)], SM, TF)
-d.edge([(PM.x + PM.w, O.cy), (TF.x, O.cy)], PM, TF)
-d.text(268, O.cy - 20, 60, 18, "10×64", fs=10)
-d.text(410, 116, 30, 18, "16", fs=10)
+# token column
+d.box(198, 58, 58, 298, "", "wht", dashed=True, sw=1.4, arc=10)
+y = 68
+for i in range(3):
+    d.box(210, y, 22, 22, "", "blue", arc=5, sw=1.4); y += 28
+d.text(206, y - 6, 30, 20, "⋮", fs=14, bold=True)
+d.text(232, 96, 26, 16, "×16", fs=10, italic=True)
+y = 196
+for i in range(3):
+    d.box(210, y, 22, 22, "", "org", arc=5, sw=1.4); y += 28
+d.text(206, y - 6, 30, 20, "⋮", fs=14, bold=True)
+d.text(232, 222, 26, 16, "×10", fs=10, italic=True)
+d.box(210, 318, 22, 22, "", "grn", arc=5, sw=1.4)
+d.text(186, 372, 70, 20, "b_{t}", **it)
+d.edge([(221, 372), (221, 342)], None, None, sw=1.6)
 
-# estimator
-MG = d.box(608, 104, 124, 110, "运动GRU\n共享查询与路由\n3个读写专家", "org", fs=12)
-d.edge([TF.p("r", 0.4), (MG.x, TF.y + 60)], TF, MG)
-d.text(554, 150, 52, 18, "X_{t}", **it)
-ST = d.box(608, 256, 92, 40, "共享状态 s_{t}", "yel", fs=11)
-d.edge([(640, MG.y + MG.h), (640, ST.y)], MG, ST)
-d.edge([(675, ST.y), (675, MG.y + MG.h)], ST, MG)
-HD = d.box(756, 120, 80, 78, "输出头", "org", fs=12)
-d.edge([MG.p("r", 0.5), (HD.x, MG.cy)], MG, HD)
-AUX = d.box(752, 246, 88, 50, "辅助解码头", "pur", fs=11, dashed=True)
-d.edge([HD.p("b"), AUX.p("t")], HD, AUX, dashed=True)
+TF = d.box(276, 58, 62, 298, "跨模态Transformer", "blue", vertical=True, fs=13, sw=1.8, arc=10)
+d.fat([(258, 207), (272, 207)], "blue", bw=8, hl=8, hw=16)
+MG = d.box(364, 58, 62, 298, "读写记忆估计器（MATE-GRU）", "org", vertical=True, fs=13, sw=1.8, arc=10)
+d.fat([(340, 207), (360, 207)], "org", bw=8, hl=10, hw=18)
+d.text(336, 182, 30, 18, "X_{t}", fs=11, italic=True)
+# shared-state loop
+d.edge([(426, 330), (446, 330), (446, 384), (395, 384), (395, 358)], None, None, sw=1.6)
+d.text(450, 360, 60, 18, "s_{t}", fs=12, italic=True, align="left")
 
-# actor
-CC = d.box(886, 70, 20, 200, "", "wht", rounded=False)
-d.text(874, 276, 44, 18, "115", fs=10)
-d.edge([HD.p("r"), (CC.x, HD.cy)], HD, CC)
-d.text(838, 138, 48, 18, "MCP_{t}", fs=11, italic=True)
-AC = d.box(930, 96, 120, 148, "共享MLP\n\n8个动作专家\n\n门控加权", "grn", fs=12)
-d.edge([(906, AC.cy), AC.p("l")], CC, AC)
+# MCP vector
+d.fat([(428, 207), (456, 207)], "org", bw=8, hl=10, hw=18)
+d.box(462, 70, 64, 276, "", "wht", dashed=True, sw=1.4, arc=8)
+segs = [("v̂_{t}", "gry"), ("ĥ^{f}_{t}", "gry"), ("z^{μ}_{t}", "yel"), ("z^{tm}_{t}", "yel"),
+        ("c_{t}", "blue"), ("r_{t}", "blue")]
+for i, (lab, col) in enumerate(segs):
+    d.box(470, 78 + i * 44, 48, 38, lab, col, rounded=False, fs=13, bold=False, italic=True)
+d.text(456, 46, 80, 20, "MCP_{t}", fs=12, bold=True, italic=True)
+# training decoders (dashed)
+d.edge([(526, 185), (560, 185)], None, None, dashed=True, sw=1.6)
+d.text(562, 174, 70, 22, "ô_{t+1}", fs=13, italic=True, align="left")
+d.edge([(526, 229), (560, 229)], None, None, dashed=True, sw=1.6)
+d.text(562, 218, 70, 22, "m̂_{t}", fs=13, italic=True, align="left")
+d.text(544, 250, 90, 34, "辅助解码\n（仅训练）", fs=10)
 
-# execution
-PD = d.box(1094, 96, 132, 64, "PD关节控制\nq* = q_{0} + 0.2a_{t}", "gry", fs=12)
-d.edge([(AC.x + AC.w, PD.cy), PD.p("l")], AC, PD)
-d.text(1052, 106, 40, 18, "a_{t}", **it)
-RB = d.box(1094, 220, 132, 64, "仿真环境 /\n四足机器人", "gry", fs=12)
-d.edge([PD.p("b"), RB.p("t")], PD, RB)
-d.text(1162, 172, 60, 30, "τ", **it)
+# ---- actor
+d.text(640, 72, 56, 22, "o_{t}, b_{t}", fs=13, italic=True, align="left")
+d.fat([(644, 104), (692, 104)], "org", bw=10, hl=14, hw=24)
+d.fat([(528, 112), (606, 112), (606, 150), (692, 150)], "blue", bw=10, hl=14, hw=24)
+AC = d.box(698, 58, 62, 210, "混合专家Actor", "grn", vertical=True, fs=13, sw=1.8, arc=10)
+d.fat([(764, 90), (792, 90)], "blue", bw=10, hl=14, hw=24)
+d.text(764, 58, 40, 22, "a_{t}", **it)
+PD = d.box(798, 58, 62, 210, "PD控制器", "gry", vertical=True, fs=13, sw=1.8, arc=10)
+d.fat([(864, 163), (892, 163)], "gry", bw=10, hl=14, hw=24)
+SIM = d.box(898, 62, 160, 92, "仿真环境\n（Isaac Gym，4096并行）", "wht", fs=12, sw=1.6, arc=14)
+REAL = d.box(898, 176, 160, 92, "四足机器人实机", "wht", fs=12, sw=1.6, arc=14)
 
-# o_t, b_t lines (vertical branches first)
-yo = 372
-d.edge([(896, yo), (896, CC.y + CC.h)], None, CC)
-d.edge([(718, yo), (718, MG.y + MG.h)], None, MG)
-d.edge([(495, yo), (495, TF.y + TF.h)], None, TF)
-d.text(498, 300, 26, 18, "b_{t}", **it)
-
-# training-only row
-PR = d.box(170, 440, 132, 52, "特权观测 x^{priv}_{t}\n269维 + b_{t}", "wht", fs=11)
-CR = d.box(340, 440, 150, 52, "非对称Critic\n8个价值专家", "pur", fs=12)
-d.edge([PR.p("r"), CR.p("l")], PR, CR)
-PPO = d.box(900, 440, 150, 52, "GAE + PPO\n更新Actor/Critic", "pur", fs=12)
-EL = d.box(720, 486, 140, 48, "估计器辅助损失\n独立Adam更新", "pur", fs=11)
-d.edge([(AUX.cx, AUX.y + AUX.h), (AUX.cx, EL.y)], AUX, EL, dashed=True)
-d.edge([CR.p("r", 0.5), (PPO.x, CR.cy)], CR, PPO)
-d.text(500, 446, 40, 18, "V_{t}", **it)
-d.edge([(PPO.cx, PPO.y), (PPO.cx, 334)], PPO, None, dashed=True)
-d.edge([RB.p("b", 0.3), (RB.x + RB.w * 0.3, 466), PPO.p("r")], RB, PPO)
-d.text(1094, 300, 70, 18, "r_{t}, x^{priv}_{t}", fs=11, italic=True)
-d.edge([OB.p("r"), (896, yo)], OB, None, arrow=False)
-d.text(140, yo - 22, 110, 18, "o_{t}, b_{t}", **it)
-
-# feedback
-d.edge([RB.p("b", 0.7), (RB.x + RB.w * 0.7, 564), (70, 564), OB.p("b")], RB, OB)
-d.text(420, 546, 420, 18, "传感器反馈：深度相机、IMU、关节编码器（每20 ms）", fs=11)
+# ---- critic (training only)
+CR = d.box(698, 300, 162, 56, "非对称Critic\n（仅训练）", "pur", fs=12, dashed=True, sw=1.6, arc=10)
+d.text(898, 296, 160, 24, "x^{priv}_{t}（269维）, b_{t}", fs=12, italic=True)
+d.edge([(978, 320), (978, 328), (CR.x + CR.w, 328)], None, CR, sw=1.6, dashed=True)
+d.edge([(CR.x + 40, CR.y), (CR.x + 40, 272)], CR, None, sw=1.6, dashed=True)
+d.text(742, 274, 110, 20, "V_{t}，用于PPO更新", fs=11, align="left")
 
 d.save("out", "fig1_overall")

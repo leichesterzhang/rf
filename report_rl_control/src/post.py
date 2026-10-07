@@ -60,6 +60,14 @@ for tb in d.tables:
                 for r in par.runs: r.font.size = Pt(10.5)
 from docx.text.paragraph import Paragraph
 for tb in d.tables:
+    prev = tb._tbl.getprevious()
+    if prev is not None and prev.tag == qn('w:p'):
+        Paragraph(prev, None).paragraph_format.keep_with_next = True
+    for row in tb.rows[:-1]:
+        for cell in row.cells:
+            for par in cell.paragraphs:
+                par.paragraph_format.keep_with_next = True
+for tb in d.tables:
     nxt = tb._tbl.getnext()
     if nxt is not None and nxt.tag == qn('w:p'):
         Paragraph(nxt, None).paragraph_format.space_before = Pt(9)

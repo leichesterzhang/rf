@@ -5,7 +5,7 @@ it = dict(italic=True, fs=12)
 d.panel(132, 8, 1096, 214, "策略网络 Actor（训练与部署）", "grn_bg", fs=12)
 d.panel(132, 234, 1096, 136, "价值网络 Critic（仅训练）", "pur_bg", fs=12)
 
-X = d.box(12, 70, 100, 76, "x^{actor}_{t}\n[o_{t}, MCP_{t}, b_{t}]\n115维", "wht", fs=11)
+X = d.box(12, 70, 100, 76, "x^{actor}_{t}\n[MCP_{t}, b_{t}, o_{t}]\n115维", "wht", fs=11)
 bus = 122
 d.edge([X.p("r"), (bus, X.cy)], X, None, arrow=False)
 d.edge([(bus, 64), (bus, 140)], arrow=False)

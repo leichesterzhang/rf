@@ -12,7 +12,7 @@ C = dict(
     grn=("#D5E8D4", "#82B366"), grn_bg=("#F3F9F1", "#8DBB72"),
     pur=("#E1D5E7", "#9673A6"), pur_bg=("#F8F4FA", "#A58BB5"),
     red=("#F8CECC", "#B85450"),
-    gry=("#F5F5F5", "#666666"), gry_bg=("#FAFAFA", "#9A9A9A"),
+    gry=("#F5F5F5", "#666666"), msk=("#BDBDBD", "#7A7A7A"), gry_bg=("#FAFAFA", "#9A9A9A"),
     wht=("#FFFFFF", "#555555"),
 )
 ARROW = "#3A3A3A"
@@ -74,11 +74,12 @@ class Diagram:
 
     def box(self, x, y, w, h, label="", color="blue", bold=True, fs=13,
             rounded=True, dashed=False, panel=False, align="center",
-            valign="middle", fc="#1A1A1A", sw=1.3, italic=False, shape="rect"):
+            valign="middle", fc="#1A1A1A", sw=1.6, italic=False, shape="rect",
+            vertical=False, arc=None):
         nd = Node(self, self._id(), x, y, w, h, label, "box", color, bold=bold,
                   fs=fs, rounded=rounded, dashed=dashed, panel=panel,
                   align=align, valign=valign, fc=fc, sw=sw, italic=italic,
-                  shape=shape)
+                  shape=shape, vertical=vertical, arc=arc)
         self.items.append(nd)
         return nd
 
@@ -97,6 +98,20 @@ class Diagram:
                   bold=bold, fc=fc, align=align, italic=italic, bg=bg)
         self.items.append(nd)
         return nd
+
+    def image(self, x, y, w, h, png_path):
+        import base64
+        b64 = base64.b64encode(open(png_path, "rb").read()).decode()
+        nd = Node(self, self._id(), x, y, w, h, "", "image", None, b64=b64)
+        self.items.append(nd)
+        return nd
+
+    def fat(self, pts, color="blue", bw=9, hl=14, hw=22):
+        """paper-style block arrow (outlined)."""
+        e = dict(kind="fat", id=self._id(), pts=[tuple(p) for p in pts],
+                 color=color, bw=bw, hl=hl, hw=hw)
+        self.items.append(e)
+        return e
 
     def edge(self, pts, src=None, dst=None, color=ARROW, sw=1.5,
              dashed=False, arrow=True, start_arrow=False):
@@ -127,6 +142,8 @@ class Diagram:
         for it in self.items:
             if isinstance(it, Node):
                 cells.append(self._dio_node(it))
+            elif it["kind"] == "fat":
+                cells.append(self._dio_fat(it))
             else:
                 cells.append(self._dio_edge(it))
         body = "\n".join(cells)
@@ -136,8 +153,26 @@ class Diagram:
                 f'pageWidth="{self.W}" pageHeight="{self.H}" math="0" shadow="0">'
                 f'<root>\n{body}\n</root></mxGraphModel></diagram></mxfile>')
 
+    def _dio_fat(self, e):
+        fill, stroke = C[e["color"]]
+        st = ["shape=flexArrow", "endArrow=classic", "html=1", "rounded=0",
+              f"fillColor={fill}", f"strokeColor={stroke}", "strokeWidth=1.5",
+              f"width={e['bw']}", f"endWidth={e['hw'] - e['bw']}", f"endSize={e['hl'] / 3:.1f}"]
+        pts = e["pts"]
+        geo = [f'<mxPoint x="{pts[0][0]}" y="{pts[0][1]}" as="sourcePoint"/>',
+               f'<mxPoint x="{pts[-1][0]}" y="{pts[-1][1]}" as="targetPoint"/>']
+        if len(pts) > 2:
+            geo.append('<Array as="points">' + "".join(
+                f'<mxPoint x="{x}" y="{y}"/>' for x, y in pts[1:-1]) + "</Array>")
+        return (f'<mxCell id="{e["id"]}" style="{";".join(st)};" edge="1" parent="1">'
+                f'<mxGeometry relative="1" as="geometry">{"".join(geo)}</mxGeometry></mxCell>')
+
     def _dio_node(self, n):
         k = n.kw
+        if n.kind == "image":
+            return (f'<mxCell id="{n.id}" value="" style="shape=image;html=1;imageAspect=0;'
+                    f'image=data:image/png,{k["b64"]};" vertex="1" parent="1">'
+                    f'<mxGeometry x="{n.x}" y="{n.y}" width="{n.w}" height="{n.h}" as="geometry"/></mxCell>')
         st = ["html=1", "whiteSpace=wrap", f"fontFamily={FONT_DIO}",
               f"fontSize={k['fs']}", f"fontColor={k['fc']}"]
         fstyle = (1 if k.get("bold") else 0) + (2 if k.get("italic") else 0)
@@ -150,9 +185,19 @@ class Diagram:
             fill, stroke = C[n.color]
             if k["shape"] == "ellipse":
                 st = ["ellipse"] + st
+            elif k["shape"] in ("trap_l", "trap_r"):
+                st = ["shape=trapezoid;perimeter=trapezoidPerimeter;size=0.22;"
+                      f"direction={'south' if k['shape'] == 'trap_l' else 'north'}"] + st
             else:
                 st.append(f"rounded={1 if k['rounded'] else 0}")
-                st.append("arcSize=10" if not k["panel"] else "absoluteArcSize=1;arcSize=24")
+                if k["panel"]:
+                    st.append("absoluteArcSize=1;arcSize=24")
+                elif k.get("arc"):
+                    st.append(f"absoluteArcSize=1;arcSize={2 * k['arc']}")
+                else:
+                    st.append("arcSize=10")
+            if k.get("vertical"):
+                st.append("horizontal=0")
             st += [f"fillColor={fill}", f"strokeColor={stroke}",
                    f"strokeWidth={k['sw']}", f"verticalAlign={k['valign']}"]
             if k["dashed"]:
@@ -192,7 +237,7 @@ class Diagram:
         o = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{self.W}" height="{self.H}" '
              f'viewBox="0 0 {self.W} {self.H}" font-family="{FONT_SVG}">',
              '<defs>']
-        cols = {it["color"] for it in self.items if isinstance(it, dict)}
+        cols = {it["color"] for it in self.items if isinstance(it, dict) and it["kind"] == "edge"}
         for c in cols:
             cid = c.strip("#")
             o.append(f'<marker id="a{cid}" viewBox="0 0 10 10" refX="9.5" refY="5" markerWidth="7" '
@@ -200,7 +245,12 @@ class Diagram:
         o.append('</defs><rect width="100%" height="100%" fill="#FFFFFF"/>')
         self._vsegs = []
         for it in self.items:
-            o.append(self._svg_node(it) if isinstance(it, Node) else self._svg_edge(it))
+            if isinstance(it, Node):
+                o.append(self._svg_node(it))
+            elif it["kind"] == "fat":
+                o.append(self._svg_fat(it))
+            else:
+                o.append(self._svg_edge(it))
         o.append("</svg>")
         return "\n".join(o)
 
@@ -235,9 +285,47 @@ class Diagram:
                        f'font-style="{style}" fill="{k["fc"]}" text-anchor="{anchor}">{"".join(spans)}</text>')
         return "".join(out)
 
+    def _svg_fat(self, e):
+        import math
+        fill, stroke = C[e["color"]]
+        P = [list(p) for p in e["pts"]]
+        (x1, y1), (x2, y2) = P[-2], P[-1]
+        L = math.hypot(x2 - x1, y2 - y1)
+        ux, uy = (x2 - x1) / L, (y2 - y1) / L
+        bx, by = x2 - ux * e["hl"], y2 - uy * e["hl"]
+        P[-1] = [bx + ux * 1.5, by + uy * 1.5]
+        d = "M" + " L".join(f"{x:.1f},{y:.1f}" for x, y in P)
+        hw = e["hw"] / 2
+        px, py = -uy, ux
+        head = f"{x2},{y2} {bx + px*hw:.1f},{by + py*hw:.1f} {bx - px*hw:.1f},{by - py*hw:.1f}"
+        return (f'<path d="{d}" fill="none" stroke="{stroke}" stroke-width="{e["bw"] + 3}" stroke-linejoin="miter"/>'
+                f'<path d="{d}" fill="none" stroke="{fill}" stroke-width="{e["bw"]}" stroke-linejoin="miter"/>'
+                f'<polygon points="{head}" fill="{fill}" stroke="{stroke}" stroke-width="1.5" stroke-linejoin="miter"/>')
+
     def _svg_node(self, n):
         k = n.kw
         s = ""
+        if n.kind == "image":
+            return (f'<image x="{n.x}" y="{n.y}" width="{n.w}" height="{n.h}" preserveAspectRatio="none" '
+                    f'href="data:image/png;base64,{k["b64"]}"/>')
+        if k.get("vertical"):
+            fill, stroke = C[n.color]
+            r = k.get("arc") or min(n.w, n.h) * 0.10
+            s += (f'<rect x="{n.x}" y="{n.y}" width="{n.w}" height="{n.h}" rx="{r:.1f}" fill="{fill}" '
+                  f'stroke="{stroke}" stroke-width="{k["sw"]}"{" stroke-dasharray=\"6 4\"" if k["dashed"] else ""}/>')
+            cx, cy = n.cx, n.cy
+            inner = self._svg_text(n, cx - n.h / 2, cy - n.w / 2, n.h, n.w, "middle", "middle")
+            return s + f'<g transform="rotate(-90 {cx} {cy})">{inner}</g>'
+        if k.get("shape") in ("trap_l", "trap_r"):
+            fill, stroke = C[n.color]
+            i = 0.22 * n.h
+            x, y, w, h = n.x, n.y, n.w, n.h
+            if k["shape"] == "trap_l":
+                pts = f"{x},{y} {x+w},{y+i} {x+w},{y+h-i} {x},{y+h}"
+            else:
+                pts = f"{x},{y+i} {x+w},{y} {x+w},{y+h} {x},{y+h-i}"
+            s += f'<polygon points="{pts}" fill="{fill}" stroke="{stroke}" stroke-width="{k["sw"]}"/>'
+            return s + self._svg_text(n, x, y, w, h, "middle", "middle")
         if n.kind == "text":
             if k.get("bg"):
                 s += f'<rect x="{n.x}" y="{n.y}" width="{n.w}" height="{n.h}" fill="{k["bg"]}"/>'
@@ -256,7 +344,7 @@ class Diagram:
         if k["panel"]:
             r = 12
         else:
-            r = min(n.w, n.h) * 0.10 if k["rounded"] else 0
+            r = (k.get("arc") or min(n.w, n.h) * 0.10) if k["rounded"] else 0
         s += (f'<rect x="{n.x}" y="{n.y}" width="{n.w}" height="{n.h}" rx="{r:.1f}" fill="{fill}" '
               f'stroke="{stroke}" stroke-width="{k["sw"]}"{dash}/>')
         anchor = "start" if k["align"] == "left" else "middle"
