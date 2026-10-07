@@ -1,0 +1,435 @@
+[
+  {
+    "path": "RM75/urdf/RM75_locked_arm.urdf",
+    "joint_types": {
+      "revolute": 12,
+      "fixed": 13
+    },
+    "joints": [
+      {
+        "name": "FL_hip_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "FL_thigh_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "FL_calf_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "FR_hip_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "FR_thigh_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "FR_calf_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "RL_hip_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "RL_thigh_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "RL_calf_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "RR_hip_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "RR_thigh_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "RR_calf_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "base_arm_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "link1_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "link2_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "link3_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "link4_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "link5_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "link6_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "frame_link_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "head_link_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "FL_foot_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "FR_foot_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "RL_foot_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "RR_foot_joint",
+        "type": "fixed"
+      }
+    ],
+    "summed_link_mass_kg": 95.89525
+  },
+  {
+    "path": "RM75/urdf/Z1_NOLIDAR.urdf",
+    "joint_types": {
+      "revolute": 12,
+      "fixed": 13
+    },
+    "joints": [
+      {
+        "name": "FL_hip_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "FL_thigh_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "FL_calf_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "FR_hip_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "FR_thigh_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "FR_calf_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "RL_hip_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "RL_thigh_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "RL_calf_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "RR_hip_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "RR_thigh_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "RR_calf_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "base_arm_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "link1_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "link2_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "link3_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "link4_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "link5_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "link6_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "frame_link_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "head_link_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "FL_foot_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "FR_foot_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "RL_foot_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "RR_foot_joint",
+        "type": "fixed"
+      }
+    ],
+    "summed_link_mass_kg": 95.89525
+  },
+  {
+    "path": "RM75/urdf/Z1_NOLIDARV11_locked_arm.urdf",
+    "joint_types": {
+      "revolute": 12,
+      "fixed": 14
+    },
+    "joints": [
+      {
+        "name": "FL_hip_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "FL_thigh_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "FL_calf_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "FR_hip_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "FR_thigh_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "FR_calf_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "RL_hip_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "RL_thigh_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "RL_calf_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "RR_hip_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "RR_thigh_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "RR_calf_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "base_arm_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "link1_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "link2_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "link3_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "link4_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "link5_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "link6_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "link7_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "frame_link_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "head_link_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "FL_foot_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "FR_foot_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "RL_foot_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "RR_foot_joint",
+        "type": "fixed"
+      }
+    ],
+    "summed_link_mass_kg": 97.89625
+  },
+  {
+    "path": "Z1_NOLIDARV1.1.SLDASM/urdf/Z1_NOLIDARV1.1.SLDASM.urdf",
+    "joint_types": {
+      "revolute": 18,
+      "fixed": 3,
+      "continuous": 1
+    },
+    "joints": [
+      {
+        "name": "FL_hip_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "FL_thigh_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "FL_calf_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "FR_hip_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "FR_thigh_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "FR_calf_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "RL_hip_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "RL_thigh_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "RL_calf_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "RR_hip_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "RR_thigh_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "RR_calf_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "base_arm_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "link1_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "link2_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "link3_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "link4_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "link5_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "link6_joint",
+        "type": "revolute"
+      },
+      {
+        "name": "link7_joint",
+        "type": "continuous"
+      },
+      {
+        "name": "frame_link_joint",
+        "type": "fixed"
+      },
+      {
+        "name": "head_link_joint",
+        "type": "fixed"
+      }
+    ],
+    "summed_link_mass_kg": 97.73625
+  }
+]
